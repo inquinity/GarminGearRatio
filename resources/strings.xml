@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<strings>
+    <string id="AppName">Di2 STEPS</string>
+
+    <!-- Which screen the field renders (see DisplayMode enum in Di2StepsView).
+         Defaults to TEST while we are still proving data retrieval.            -->
+    <string id="DisplayModeTitle">Display Mode</string>
+
+    <!-- Write raw BLE packets into the FIT file for after-the-ride debugging.  -->
+    <string id="DebugTitle">Debug Logging</string>
+
+    <!-- Drivetrain configuration. The STEPS stream reports current gear and
+         max gear (cassette size), but NOT tooth counts, so those are entered
+         here (or via the on-device wizard). Ebikes are usually 1x.            -->
+    <string id="FrontRingsTitle">Front Rings</string>
+    <string id="FrontTeethTitle">Front Teeth (CSV)</string>
+    <string id="RearTeethTitle">Rear Teeth (CSV)</string>
+
+    <!-- Lock onto one bike by MAC address so we never connect to a stranger's
+         SC-EM800. Left blank = connect to the strongest matching device.      -->
+    <string id="LastLockTitle">Lock to Saved Bike</string>
+    <string id="LastMACTitle">Saved Bike MAC (hex)</string>
+</strings>

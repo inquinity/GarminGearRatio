@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<properties>
+    <!-- ── Which screen to render ───────────────────────────────────────────
+         Mirrors the DisplayMode enum in Di2StepsView.mc:
+           0 = RIDE        gear / ratio / assist mode (replaces a Di2 page)
+           1 = GEAR_CONFIG drivetrain topology + tooth counts
+           2 = TEST        name/value table of every decoded field (diagnostics)
+         Defaults to TEST while we are still proving data retrieval end-to-end. -->
+    <property id="DisplayMode" type="Number">2</property>
+
+    <!-- Write raw BLE packets into the FIT file for after-the-ride debugging.
+         Off by default so it costs no memory/battery for normal use.          -->
+    <property id="Debug" type="Boolean">false</property>
+
+    <!-- ── Drivetrain (user-entered — not present in the STEPS stream) ───────
+         Ebikes are usually 1x. Rear cog COUNT is known live from the stream
+         (max gear), but the tooth VALUES are always user-entered.             -->
+    <property id="FrontRings" type="Number">1</property>
+    <property id="FrontTeeth" type="String"></property>
+    <property id="RearTeeth"  type="String"></property>
+
+    <!-- ── Bike identity ────────────────────────────────────────────────────
+         LastMAC is stored automatically after first connect. Enable LastLock
+         to only ever reconnect to that saved bike.                            -->
+    <property id="LastLock" type="Boolean">false</property>
+    <property id="LastMAC"  type="String"></property>
+</properties>

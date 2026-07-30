@@ -1,0 +1,8 @@
+# Connect IQ build output
+bin/
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store

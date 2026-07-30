@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<settings>
+    <setting propertyKey="@Properties.DisplayMode" title="@Strings.DisplayModeTitle">
+        <settingConfig type="list">
+            <listEntry value="0">Ride</listEntry>
+            <listEntry value="1">Gear Config</listEntry>
+            <listEntry value="2">Test / Diagnostics</listEntry>
+        </settingConfig>
+    </setting>
+
+    <setting propertyKey="@Properties.Debug" title="@Strings.DebugTitle">
+        <settingConfig type="boolean"/>
+    </setting>
+
+    <setting propertyKey="@Properties.FrontRings" title="@Strings.FrontRingsTitle">
+        <settingConfig type="numeric" min="1" max="2"/>
+    </setting>
+    <setting propertyKey="@Properties.FrontTeeth" title="@Strings.FrontTeethTitle">
+        <settingConfig type="alphaNumeric"/>
+    </setting>
+    <setting propertyKey="@Properties.RearTeeth" title="@Strings.RearTeethTitle">
+        <settingConfig type="alphaNumeric"/>
+    </setting>
+
+    <setting propertyKey="@Properties.LastLock" title="@Strings.LastLockTitle">
+        <settingConfig type="boolean"/>
+    </setting>
+    <setting propertyKey="@Properties.LastMAC" title="@Strings.LastMACTitle">
+        <settingConfig type="alphaNumeric"/>
+    </setting>
+</settings>
