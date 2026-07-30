@@ -4,7 +4,7 @@ import Toybox.StringUtil;
 // Decoded state from the SC-EM800's multiplexed 2AC1 characteristic, plus a
 // small ring of the last raw packet seen per type-tag for the TEST screen.
 //
-// Wire format is documented in SCEM800-BLE-protocol.md. Each notification's
+// Wire format is documented in docs/SCEM800-BLE-protocol.md. Each notification's
 // FIRST byte is a type tag; payload length is fixed per type. We branch on the
 // tag (more robust than branching on size) and pull known offsets.
 //

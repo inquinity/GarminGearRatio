@@ -34,7 +34,7 @@ class ShimanoBleDelegate extends Ble.BleDelegate {
     private var currentScanning as Boolean = false;
     private var wantScanning as Boolean = false;
 
-    // ── Shimano UUIDs (see SCEM800-BLE-protocol.md) ───────────────────────────
+    // ── Shimano UUIDs (see docs/SCEM800-BLE-protocol.md) ──────────────────────
     // SC-EM800 advertises the 0x18FF service; we filter scan results on it.
     private var advertisedServiceUuid    = Ble.stringToUuid("000018ff-5348-494d-414e-4f5f424c4500");
     private var modeServiceUuid          = Ble.stringToUuid("000018ef-5348-494d-414e-4f5f424c4500");

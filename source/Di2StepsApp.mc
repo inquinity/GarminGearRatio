@@ -6,7 +6,7 @@ import Toybox.WatchUi;
 // renders it as a Connect IQ data field. Sibling to GearRatio, which reads the
 // same class of data over ANT+ Di2; this app is for bikes where the Di2 stream
 // is not exposed but the STEPS BLE stream is. See the project plan and
-// SCEM800-BLE-protocol.md for the wire format.
+// docs/SCEM800-BLE-protocol.md for the wire format.
 class Di2StepsApp extends Application.AppBase {
 
     private var _view as Di2StepsView?;

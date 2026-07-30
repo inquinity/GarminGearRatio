@@ -6,7 +6,7 @@ it as a Garmin data field. Sibling to **GearRatio** (`../GarminGearRatio`), whic
 reads the same class of data over ANT+ Di2; this app is for bikes where the Di2
 stream is not exposed but the STEPS BLE stream is.
 
-- **Wire format (source of truth):** `SCEM800-BLE-protocol.md`
+- **Wire format (source of truth):** `docs/SCEM800-BLE-protocol.md`
 - **Architecture / plan:** `~/.claude/plans/we-are-creating-a-polymorphic-quail.md`
 - **BLE reference impl (kept out of this repo):** `markdotai/emtb` cloned at
   `/Users/robert/dev/oss/emtb` — `source/emtbDelegate.mc` is the proven BLE
