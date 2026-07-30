@@ -130,19 +130,19 @@ class Di2StepsView extends WatchUi.DataField {
         var lines = [];
         lines.add(statusLine());
         lines.add("Gear: " + numOr(_data.gear) + " / " + numOr(_data.maxGear));
-        lines.add("Mode: " + modeLabel());
-        lines.add("Spd:  " + (_data.speed >= 0 ? _data.speed.format("%.1f") : "--"));
-        lines.add("Cad:  " + numOr(_data.cadence));
-        lines.add("Asst: " + numOr(_data.assistLevel));
-        lines.add("Batt: " + (_data.battery >= 0 ? _data.battery.toString() + "%" : "--"));
+        lines.add("Assist Mode: " + modeLabel());
+        lines.add("Speed: " + (_data.speed >= 0 ? _data.speed.format("%.1f") : "--"));
+        lines.add("Cadence: " + numOr(_data.cadence));
+        lines.add("Assist Level: " + numOr(_data.assistLevel));
+        lines.add("Battery: " + (_data.battery >= 0 ? _data.battery.toString() + "%" : "--"));
         if (_data.profileName != null) {
-            lines.add("Prof: " + _data.profileName);
+            lines.add("Profile: " + _data.profileName);
         }
         for (var i = 0; i < RAW_TAGS.size(); i++) {
             var tag = RAW_TAGS[i];
             var hex = _data.hexFor(tag);
             if (!hex.equals("")) {
-                lines.add("T" + tag.format("%02X") + ": " + clip(hex, 34));
+                lines.add("Type " + tag.format("%02X") + ": " + clip(hex, 34));
             }
         }
         drawList(dc, lines);
@@ -152,9 +152,9 @@ class Di2StepsView extends WatchUi.DataField {
 
     private function statusLine() as String {
         if (_ble == null) {
-            return "BLE off";
+            return "Bluetooth off";
         } else if (_ble.isConnecting()) {
-            return _ble.isRegistered() ? "Scanning..." : "BLE init...";
+            return _ble.isRegistered() ? "Scanning..." : "Initializing...";
         } else if (_ble.isConnected()) {
             return "Connected";
         }
