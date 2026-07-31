@@ -41,28 +41,41 @@ mkdir -p bin
 echo "✓ Built: $PRG_OUTPUT"
 echo ""
 
-# Step 2: Deploy
-echo "Step 2: Deploying to Edge 1050 via SwiftMTP..."
-echo ""
-echo "Make sure your Edge 1050 is:"
-echo "  1. Connected to USB"
-echo "  2. In MTP mode (not Garmin Basemap mode)"
-echo "  3. Unlocked"
+# Step 2: Discover device
+echo "Step 2: Detecting Edge 1050..."
+DEVICES=$("$SWIFTMTP" devices 2>&1 | grep "Edge 1050")
+if [ -z "$DEVICES" ]; then
+    echo "Error: Edge 1050 not found. Make sure it's connected in MTP mode and unlocked."
+    exit 1
+fi
+DEVICE_ID=$(echo "$DEVICES" | cut -d'|' -f3)
+STORAGE_ID="65537"
+echo "✓ Found device: $DEVICE_ID"
 echo ""
 
-"$SWIFTMTP" push "$PRG_OUTPUT" /GARMIN/Apps
-echo "✓ Pushed to device"
+# Step 3: Deploy
+echo "Step 3: Deploying to Edge 1050 via SwiftMTP..."
 echo ""
 
-# Step 3: Complete
-echo "Step 3: Finalizing..."
+# Remove old version if it exists
+if echo -e "y" | "$SWIFTMTP" rm -r "$DEVICE_ID" "$STORAGE_ID" /GARMIN/Apps/di2steps.prg 2>/dev/null; then
+    echo "✓ Removed old version"
+fi
+
+# Push new version
+PRG_FULL_PATH="$(pwd)/$PRG_OUTPUT"
+echo -e "Pushing $(basename "$PRG_OUTPUT") to device..."
+"$SWIFTMTP" push "$DEVICE_ID" "$STORAGE_ID" "$PRG_FULL_PATH" /GARMIN/Apps/
+echo "✓ Deployment complete"
 echo ""
+
+# Step 4: Instructions
 echo "Next steps:"
 echo "  1. Disconnect the Edge 1050 from USB"
 echo "  2. Restart the Edge 1050 device"
-echo "  3. The data field should now be available"
+echo "  3. The di2steps data field should now be available"
 echo ""
-echo "To test:"
+echo "To validate:"
 echo "  - Set DisplayMode = 2 (Test/Diagnostics) in app settings"
 echo "  - Check connection status and data flow in Test screen"
 echo ""
