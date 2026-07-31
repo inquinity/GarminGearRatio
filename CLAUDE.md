@@ -27,7 +27,9 @@ BLE connection owned by the field; "pages" are **display modes** chosen via the
 
 SDK: `~/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-9.2.0-2026-06-09-92a1605b2`
 Dev key: `/Users/robert/Certs/garmin_developer_key.der`
+Deployment tool: **SwiftMTP** (`github.com/Neighbor-Z/SwiftMTP`) — CLI for MTP file transfer to Garmin devices
 
+### Simulator workflow
 ```bash
 SDK="$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-9.2.0-2026-06-09-92a1605b2"
 "$SDK/bin/monkeyc" -d edge1050 -f monkey.jungle -o bin/di2steps.prg -y /Users/robert/Certs/garmin_developer_key.der
@@ -35,8 +37,20 @@ open "$SDK/bin/ConnectIQ.app"           # launch simulator
 "$SDK/bin/monkeydo" bin/di2steps.prg edge1050
 ```
 
+### Device deployment
+After building the `.prg` file, transfer to Edge 1050 via SwiftMTP:
+```bash
+swiftmtp push bin/di2steps.prg /GARMIN/Apps
+```
+Then restart the Edge 1050 to load the data field.
+
 **Note:** BLE cannot be exercised in the simulator (it stays on "BLE init..."/
 "Scanning..."). Live gear/mode data must be validated on the real Edge 1050 + bike.
 
 Type checking is strict (as in GearRatio): BLE iterators return `Object`, so cast
 results to `Ble.Device` / `Ble.ScanResult` when calling their methods.
+
+# git
+Use git commits instead of PRs
+Keep commits atomic: small and focused on a single change
+Use short commit messages (1-3 lines); if there is a need for a more extensive message, ask before continuing.
