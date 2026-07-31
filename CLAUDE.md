@@ -8,9 +8,12 @@ stream is not exposed but the STEPS BLE stream is.
 
 - **Wire format (source of truth):** `docs/SCEM800-BLE-protocol.md`
 - **Architecture / plan:** `~/.claude/plans/we-are-creating-a-polymorphic-quail.md`
-- **BLE reference impl (kept out of this repo):** `markdotai/emtb` cloned at
-  `/Users/robert/dev/oss/emtb` — `source/emtbDelegate.mc` is the proven BLE
-  state machine our `ShimanoBleDelegate.mc` is ported from.
+- **BLE reference impls (kept out of this repo):**
+  - **emtb** (original): `markdotai/emtb` at `/Users/robert/dev/oss/emtb` — the proven BLE 
+    state machine our `ShimanoBleDelegate.mc` is ported from.
+  - **ebikeDataField** (updated/derivative): `MarkusDatgloi/ebikeDataField` at `/Users/robert/dev/oss/ebikeDataField` — 
+    fixes for Garmin CIQ BLE profile registration bug (reports "ErrPrf_N" when profiles fail), 
+    best practices for multi-device Shimano STEPS data fields.
 
 ## App type & structure
 
@@ -22,6 +25,13 @@ BLE connection owned by the field; "pages" are **display modes** chosen via the
 - `source/Di2StepsView.mc` — DataField; `onUpdate` dispatches on `DisplayMode`.
 - `source/ShimanoBleDelegate.mc` — BLE central: scan/pair/identify-by-MAC/notify.
 - `source/StepsData.mc` — decoded state + raw-packet capture for the Test screen.
+
+## Known issues & validation notes
+
+**BLE profile registration:** Garmin CIQ has a documented bug on VivoActive 4 / Venu where 
+registering the 2nd and 3rd BLE profiles fails silently. Edge 1050 should not be affected, 
+but if connection fails on device, check `StepsData.errorReport` in Test mode for "ErrPrf_1"/"ErrPrf_2" 
+(see ebikeDataField reference above for details).
 
 ## Build & run
 
