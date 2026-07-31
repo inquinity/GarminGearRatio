@@ -82,3 +82,21 @@ needs to capture at higher rate, or in more detail than nRF Connect provides).
 
 ## Status log
 - 2026-07-29: Plan created. Starting with Path 1 (nRF Connect).
+- 2026-07-30: Path A (protocol reverse-engineering) complete and validated
+  (`SCEM800-BLE-protocol.md`). Path B reframed from "integrate into GearRatio"
+  to a **new standalone data-field app, `di2steps`**, in this repo (see
+  `PATHB-CONNECTIQ-PLAN.md` header note and
+  `~/.claude/plans/we-are-creating-a-polymorphic-quail.md` for the current
+  architecture). Implemented and committed roadmap **Stage 1 (skeleton)** and
+  **Stage 2 (BLE retrieval + TEST/diagnostics screen)**: `Di2StepsApp.mc`,
+  `Di2StepsView.mc`, `ShimanoBleDelegate.mc` (emtb-ported scan/pair/notify
+  state machine), `StepsData.mc`. TEST screen renders connection status plus
+  every decoded field (gear/max, assist mode, speed, cadence, assist level,
+  battery, profile) and the last raw packet per type-tag; labels spelled out,
+  not abbreviated. Docs moved into `docs/`. Compiles/runs in the simulator.
+  **Not yet done:** Stage 3 (RIDE mode — `drawRide` is a stub), Stage 4 (config
+  wizard + GEAR_CONFIG mode — `drawGearConfig` is a stub), Stage 5 (FIT debug
+  capture). **Critical caveat:** BLE cannot be exercised in the simulator —
+  Stage 2's exit criteria (live gear/mode tracking across the full 1–11 range)
+  are **unverified on real Edge 1050 + SC-EM800 hardware**; that on-device
+  validation is the immediate next step before building RIDE mode on top.
