@@ -30,6 +30,17 @@ class Di2StepsView extends WatchUi.DataField {
     private const ASSIST_NAMES = ["Off", "Eco", "Trail", "Boost", "Walk"];
     private const RAW_TAGS = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06];
 
+    // Font ladders, smallest → largest. A data field's dc is sized to its slot
+    // (full-screen single field, half-width, or one row of a multi-field page),
+    // so we pick the largest font whose content still fits rather than hardcode.
+    private const TEXT_FONTS = [
+        Graphics.FONT_XTINY,
+        Graphics.FONT_TINY,
+        Graphics.FONT_SMALL,
+        Graphics.FONT_MEDIUM,
+        Graphics.FONT_LARGE
+    ];
+
     function initialize() {
         DataField.initialize();
         _data = new StepsData();
@@ -177,19 +188,72 @@ class Di2StepsView extends WatchUi.DataField {
         return (s.length() > max) ? s.substring(0, max) : s;
     }
 
+    // Largest font from TEXT_FONTS whose line height (× lineCount) and widest
+    // line both fit within the given box. Falls back to the smallest font.
+    private function fitFont(dc as Graphics.Dc, lines as Array, w as Number, h as Number) as Graphics.FontDefinition {
+        var best = TEXT_FONTS[0];
+        for (var f = 0; f < TEXT_FONTS.size(); f++) {
+            var font = TEXT_FONTS[f];
+            if (dc.getFontHeight(font) * lines.size() > h) {
+                break;
+            }
+            var widest = 0;
+            for (var i = 0; i < lines.size(); i++) {
+                var tw = dc.getTextWidthInPixels(lines[i], font);
+                if (tw > widest) {
+                    widest = tw;
+                }
+            }
+            if (widest > w) {
+                break;
+            }
+            best = font;
+        }
+        return best;
+    }
+
     private function drawList(dc as Graphics.Dc, lines as Array) as Void {
-        var font = Graphics.FONT_XTINY;
+        var margin = 4;
+        var w = dc.getWidth() - 2 * margin;
+        var h = dc.getHeight() - 2 * margin;
+        var font = fitFont(dc, lines, w, h);
         var lh = dc.getFontHeight(font);
-        var x = 6;
-        var y = 4;
+        // Vertically center the block within the available height.
+        var y = margin + (h - lh * lines.size()) / 2;
+        if (y < margin) {
+            y = margin;
+        }
         for (var i = 0; i < lines.size(); i++) {
-            dc.drawText(x, y, font, lines[i], Graphics.TEXT_JUSTIFY_LEFT);
+            dc.drawText(margin, y, font, lines[i], Graphics.TEXT_JUSTIFY_LEFT);
             y += lh;
         }
     }
 
     private function drawCentered(dc as Graphics.Dc, msg as String) as Void {
-        dc.drawText(dc.getWidth() / 2, dc.getHeight() / 2, Graphics.FONT_SMALL, msg,
-            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        var lines = split(msg, "\n");
+        var margin = 4;
+        var w = dc.getWidth() - 2 * margin;
+        var h = dc.getHeight() - 2 * margin;
+        var font = fitFont(dc, lines, w, h);
+        var lh = dc.getFontHeight(font);
+        var cx = dc.getWidth() / 2;
+        var y = (dc.getHeight() - lh * lines.size()) / 2;
+        for (var i = 0; i < lines.size(); i++) {
+            dc.drawText(cx, y, font, lines[i], Graphics.TEXT_JUSTIFY_CENTER);
+            y += lh;
+        }
+    }
+
+    // Minimal string splitter (Monkey C has no String.split for arbitrary seps).
+    private function split(s as String, sep as String) as Array<String> {
+        var out = [];
+        var idx = s.find(sep);
+        while (idx != null) {
+            out.add(s.substring(0, idx));
+            s = s.substring(idx + sep.length(), s.length());
+            idx = s.find(sep);
+        }
+        out.add(s);
+        return out;
     }
 }
