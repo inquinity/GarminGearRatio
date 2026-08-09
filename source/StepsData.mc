@@ -1,3 +1,4 @@
+import Toybox.Activity;
 import Toybox.Lang;
 import Toybox.StringUtil;
 
@@ -31,7 +32,51 @@ class StepsData {
     // Bounded at one entry per known tag, so this stays tiny.
     public var lastPackets as Dictionary = {};
 
+    // ── Activity.Info drivetrain (second, independent data source) ────────────
+    //
+    // The head unit decodes STEPS gear position itself and exposes it to any
+    // data field with no permission at all. Kept in its own block, deliberately
+    // NOT merged into gear/maxGear above, so the two sources can be compared on
+    // the Test screen instead of one silently masking the other.
+    //
+    // Three states, and the difference between the last two is the entire point
+    // of this probe — do not collapse them:
+    //   activitySupported == false  -> the API doesn't expose these fields here
+    //   activityRead == false       -> not sampled yet
+    //   value == null               -> sampled, and the head unit had nothing
+    //
+    // `…Size` is teeth. Garmin's own Gear Ratio field renders blank on this
+    // bike, so the expectation is that both Size fields come back null.
+    public var activitySupported as Boolean = false;
+    public var activityRead      as Boolean = false;
+
+    public var frontIndex as Number? = null;
+    public var frontMax   as Number? = null;
+    public var frontSize  as Number? = null;
+    public var rearIndex  as Number? = null;
+    public var rearMax    as Number? = null;
+    public var rearSize   as Number? = null;
+
     function initialize() {
+    }
+
+    // Sample the derailleur fields from the per-second Activity.Info. Guarded
+    // with `has` so a device/API level without them degrades to "n/a" instead
+    // of throwing.
+    function onActivityInfo(info as Activity.Info) as Void {
+        if (!(info has :rearDerailleurIndex)) {
+            activitySupported = false;
+            return;
+        }
+        activitySupported = true;
+        activityRead      = true;
+
+        frontIndex = info.frontDerailleurIndex;
+        frontMax   = info.frontDerailleurMax;
+        frontSize  = info.frontDerailleurSize;
+        rearIndex  = info.rearDerailleurIndex;
+        rearMax    = info.rearDerailleurMax;
+        rearSize   = info.rearDerailleurSize;
     }
 
     // Parse one raw notification payload from the mode/gear characteristic.

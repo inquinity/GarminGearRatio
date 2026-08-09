@@ -27,6 +27,11 @@ class Di2StepsView extends WatchUi.DataField {
     private const BATTERY_INTERVAL = 15;
     private var _secsSinceBattery as Number = BATTERY_INTERVAL;
 
+    // Shown on the Test screen so you can tell at a glance which build the Edge
+    // is actually running. Bump this alongside the manifest version on every
+    // push — a stale tag is worse than no tag.
+    private const BUILD_TAG = "B5";
+
     private const ASSIST_NAMES = ["Off", "Eco", "Trail", "Boost", "Walk"];
     private const RAW_TAGS = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06];
 
@@ -94,6 +99,11 @@ class Di2StepsView extends WatchUi.DataField {
     // ── Per-second update ─────────────────────────────────────────────────────
 
     function compute(info as Activity.Info) as Void {
+        // Second data source, independent of BLE: the head unit decodes STEPS
+        // gear position itself. Sampled before the BLE early-return below so it
+        // still populates if the BLE stack never comes up.
+        _data.onActivityInfo(info);
+
         if (_ble == null) {
             return;
         }
@@ -138,25 +148,74 @@ class Di2StepsView extends WatchUi.DataField {
     // packet seen per type-tag. This is the primary check that data retrieval
     // works end-to-end.
     private function drawTest(dc as Graphics.Dc) as Void {
-        var lines = [];
-        lines.add(statusLine());
-        lines.add("Gear: " + numOr(_data.gear) + " / " + numOr(_data.maxGear));
-        lines.add("Assist Mode: " + modeLabel());
-        lines.add("Speed: " + (_data.speed >= 0 ? _data.speed.format("%.1f") : "--"));
-        lines.add("Cadence: " + numOr(_data.cadence));
-        lines.add("Assist Level: " + numOr(_data.assistLevel));
-        lines.add("Battery: " + (_data.battery >= 0 ? _data.battery.toString() + "%" : "--"));
+        // Decoded values: short labels so line WIDTH doesn't force a tiny font.
+        // These are what you watch while testing, so they get the large block.
+        var values = [];
+        // Build tag + live field size. Confirms which build is actually running
+        // on device (the Edge keeps the old app if the manifest version didn't
+        // increase) and what dc size onUpdate is handed. Re-tag on every push.
+        values.add(BUILD_TAG + " " + dc.getWidth() + "x" + dc.getHeight());
+        values.add(statusLine());
+        // Rows prefixed "A:" come from Activity.Info, not from the BLE stream.
+        // Shown adjacent to the BLE gear row on purpose: this side-by-side is
+        // the comparison the whole probe exists to make.
+        values.add("Gear " + numOr(_data.gear) + "/" + numOr(_data.maxGear));
+        values.add("A:R " + actOr(_data.rearIndex) + "/" + actOr(_data.rearMax)
+                   + " t" + actOr(_data.rearSize));
+        values.add("A:F " + actOr(_data.frontIndex) + "/" + actOr(_data.frontMax)
+                   + " t" + actOr(_data.frontSize));
+        values.add("Mode " + modeLabel());
+        values.add("Speed " + (_data.speed >= 0 ? _data.speed.format("%.1f") : "--"));
+        values.add("Cad " + numOr(_data.cadence));
+        values.add("Asst " + numOr(_data.assistLevel));
+        values.add("Bat " + (_data.battery >= 0 ? _data.battery.toString() + "%" : "--"));
         if (_data.profileName != null) {
-            lines.add("Profile: " + _data.profileName);
+            values.add("Prof " + _data.profileName);
         }
+        // Raw per-tag hex capture: inherently wide, so keep it in its own small
+        // block at the bottom instead of shrinking every value line to match.
+        var raw = [];
         for (var i = 0; i < RAW_TAGS.size(); i++) {
             var tag = RAW_TAGS[i];
             var hex = _data.hexFor(tag);
             if (!hex.equals("")) {
-                lines.add("Type " + tag.format("%02X") + ": " + clip(hex, 34));
+                raw.add(tag.format("%02X") + ": " + clip(hex, 34));
             }
         }
-        drawList(dc, lines);
+        drawTestLayout(dc, values, raw);
+    }
+
+    // Values fill the slot at the largest font that fits; raw hex (if any) gets
+    // a small fixed-font strip at the bottom, capped so it can't starve values.
+    private function drawTestLayout(dc as Graphics.Dc, values as Array, raw as Array) as Void {
+        var margin = 4;
+        var x = margin;
+        var top = margin;
+        var w = dc.getWidth() - 2 * margin;
+        var totalH = dc.getHeight() - 2 * margin;
+
+        if (raw.size() == 0) {
+            drawBlock(dc, values, x, top, w, totalH);
+            return;
+        }
+
+        var rawFont = Graphics.FONT_XTINY;
+        var rawLh = dc.getFontHeight(rawFont);
+        var rawH = rawLh * raw.size();
+        var maxRawH = totalH * 2 / 5;   // raw never takes more than 40% of height
+        if (rawH > maxRawH) {
+            rawH = maxRawH;
+        }
+        drawBlock(dc, values, x, top, w, totalH - rawH);
+
+        var ry = top + (totalH - rawH);
+        for (var i = 0; i < raw.size(); i++) {
+            if (ry + rawLh > top + totalH) {
+                break;
+            }
+            dc.drawText(x, ry, rawFont, raw[i], Graphics.TEXT_JUSTIFY_LEFT);
+            ry += rawLh;
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -182,6 +241,21 @@ class Di2StepsView extends WatchUi.DataField {
 
     private function numOr(n as Number) as String {
         return (n >= 0) ? n.toString() : "--";
+    }
+
+    // Activity.Info fields are nullable, so they need three renderings, not two.
+    // "null" must stay visually distinct from "--": "--" means we haven't looked
+    // yet, "null" means we looked and the head unit had nothing — which is the
+    // expected result for the teeth fields and the answer this probe is after.
+    private function actOr(n as Number?) as String {
+        if (!_data.activitySupported) {
+            return "n/a";
+        } else if (!_data.activityRead) {
+            return "--";
+        } else if (n == null) {
+            return "null";
+        }
+        return n.toString();
     }
 
     private function clip(s as String, max as Number) as String {
@@ -212,20 +286,18 @@ class Di2StepsView extends WatchUi.DataField {
         return best;
     }
 
-    private function drawList(dc as Graphics.Dc, lines as Array) as Void {
-        var margin = 4;
-        var w = dc.getWidth() - 2 * margin;
-        var h = dc.getHeight() - 2 * margin;
+    // Left-aligned lines filling the given box at the largest font that fits,
+    // vertically centered within the box.
+    private function drawBlock(dc as Graphics.Dc, lines as Array, x as Number, y as Number, w as Number, h as Number) as Void {
         var font = fitFont(dc, lines, w, h);
         var lh = dc.getFontHeight(font);
-        // Vertically center the block within the available height.
-        var y = margin + (h - lh * lines.size()) / 2;
-        if (y < margin) {
-            y = margin;
+        var ty = y + (h - lh * lines.size()) / 2;
+        if (ty < y) {
+            ty = y;
         }
         for (var i = 0; i < lines.size(); i++) {
-            dc.drawText(margin, y, font, lines[i], Graphics.TEXT_JUSTIFY_LEFT);
-            y += lh;
+            dc.drawText(x, ty, font, lines[i], Graphics.TEXT_JUSTIFY_LEFT);
+            ty += lh;
         }
     }
 
