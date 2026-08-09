@@ -14,6 +14,7 @@ SDK_PATH="$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-
 DEV_KEY="/Users/robert/Certs/garmin_developer_key.der"
 PRG_OUTPUT="bin/di2steps.prg"
 MONKEY_JUNGLE="monkey.jungle"
+MANIFEST="manifest.xml"
 # SwiftMTP ships as a sandboxed app; the CLI lives inside the bundle (there is
 # no `swiftmtp` on PATH). Device and storage IDs are not invariant, so we
 # discover them at deploy time rather than hardcoding.
@@ -36,6 +37,11 @@ if [ ! -f "$DEV_KEY" ]; then
 fi
 
 mkdir -p bin
+# Report the app version being built. The Edge only updates an installed app
+# when this manifest version increases (same UUID), so surfacing it here makes
+# it obvious whether the build will land as an update on device.
+app_version="$(awk -F'version="' '/<iq:application/ { split($2, a, "\""); print a[1]; exit }' "$MANIFEST")"
+echo "App version: ${app_version:-<unset>}"
 "$SDK_PATH/bin/monkeyc" -d edge1050 -f "$MONKEY_JUNGLE" -o "$PRG_OUTPUT" -y "$DEV_KEY"
 echo "✓ Built: $PRG_OUTPUT"
 echo ""
