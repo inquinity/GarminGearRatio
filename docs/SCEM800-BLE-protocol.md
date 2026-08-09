@@ -4,6 +4,17 @@ Status: **Validated** (Path A complete, 2026-07-29)
 Device tested: SC-EM800 head unit, advertised as "SCEM800 73A"
 Tooling: nRF Connect for Mobile (iOS), CSV log export (`SCEM800_73A.csv`)
 
+> **Scope note (2026-08-09).** The wire format below is unchanged and still
+> correct. What changed is why you'd use it. The Edge 1050 decodes STEPS **gear
+> position** on its own and hands it to any data field via
+> `Activity.Info.rearDerailleurIndex`/`Max` and the front equivalents — no BLE,
+> no ANT, no permission. So this protocol is not the only route to gear
+> position, and is likely no longer the preferred one. Its unique value is the
+> **assist/motor** data: assist mode, assist level, cadence, speed, rider
+> profile name. Treat the `0x00` gear packet documented here as a cross-check
+> against `Activity.Info` rather than as the primary source. See `CLAUDE.md`
+> § Data sources.
+
 ## Device Identification
 
 | Field | Value |

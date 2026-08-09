@@ -100,3 +100,34 @@ needs to capture at higher rate, or in more detail than nRF Connect provides).
   Stage 2's exit criteria (live gear/mode tracking across the full 1–11 range)
   are **unverified on real Edge 1050 + SC-EM800 hardware**; that on-device
   validation is the immediate next step before building RIDE mode on top.
+- 2026-08-09: **Re-assessment — the head unit already has the gear data.**
+  After re-pairing the Edge 1050 with the trike, Garmin's *built-in* fields
+  showed "Rear cog position" = `1/11` and "Front chain position" = `1/1`, both
+  correct, while the built-in "Gear ratio" field rendered blank. So the Edge
+  receives and decodes STEPS drivetrain position independently of this app.
+
+  Confirmed against the 9.2.0 SDK docs that a Connect IQ data field can read
+  the same values from `Toybox.Activity.Info` — `frontDerailleurIndex/Max/Size`
+  and `rearDerailleurIndex/Max/Size`, `@since` API 2.1.0, supported on
+  `edge1050`, requiring **no permission**. `Di2StepsView.compute(info)` has
+  been receiving that object all along and ignoring it. Working hypothesis for
+  the blank ratio field: both `…Size` (teeth) values come back `null`, i.e.
+  STEPS broadcasts positions but not tooth counts. **Unverified** — that is
+  what the current probe exists to settle.
+
+  Dead end recorded: `AntPlus.Shifting.getShiftingStatus()` is unusable here.
+  The SDK doc states verbatim it "Will not provide status for Shimano shifting
+  systems." Do not revisit.
+
+  Decisions: stay in this repo on branch `activityinfo-probe` rather than
+  forking a second MonkeyC project — one field on one ride shows the BLE-decoded
+  gear and the `Activity.Info` gear side by side, which two separate apps can't
+  do as cleanly, and git provides the path back. No standalone BLE-only test
+  run; BLE Stage-2 validation folds into the same ride. The fork-or-keep
+  decision is deferred until the probe reports.
+
+  Also found during re-assessment: the CIQ SDK is no longer at the documented
+  `$HOME` path (build is broken until reinstalled); `CLAUDE.md` documented a
+  `StepsData.errorReport` field that was never implemented (corrected); the
+  `Debug`/`FrontRings`/`FrontTeeth`/`RearTeeth` properties are surfaced in
+  settings but read by no source file (now annotated as reserved).
