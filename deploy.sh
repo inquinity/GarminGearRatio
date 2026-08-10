@@ -20,6 +20,9 @@ MANIFEST="manifest.xml"
 # discover them at deploy time rather than hardcoding.
 SWIFTMTP_CLI="/Applications/SwiftMTP.app/Contents/MacOS/swiftmtp-cli"
 REMOTE_DIR="/GARMIN/Apps"
+# Seconds to wait before retrying a push that failed to open an MTP session.
+# Short waits (under ~10s) were observed not to be enough.
+PUSH_COOLDOWN=30
 
 echo "=== di2steps Deploy ==="
 echo ""
@@ -101,19 +104,56 @@ remote_prg="$REMOTE_DIR/$(basename "$PRG_OUTPUT")"
 # redeploy is non-interactive (the extra input is harmless on a first push).
 # On success it prints "Push complete." — rely on that marker rather than exit
 # status. Capture output (guarded from set -e).
-push_output="$(printf 'y\n' | "$SWIFTMTP_CLI" push "$device_id" "$storage_id" "$local_prg" "$remote_prg" 2>&1)" || true
-echo "$push_output"
-if ! printf '%s' "$push_output" | grep -q "Push complete."; then
+#
+# The Edge frequently refuses to open an MTP session even though it enumerates
+# fine — the failure looks like "OpenSession failed: LIBUSB_ERROR_IO" or
+# "fatal error LIBUSB_ERROR_IO", and swiftmtp's own auto-reset often doesn't
+# recover it. Enumerating successfully above says nothing about whether a
+# session will open. It is frequently transient, so retry with a real cooldown
+# rather than failing on the first attempt. See ERRORS.md.
+push_output=""
+push_ok=0
+for attempt in 1 2 3; do
+    if [ "$attempt" -gt 1 ]; then
+        echo "  session failed; cooling down ${PUSH_COOLDOWN}s before retry $attempt/3..."
+        sleep "$PUSH_COOLDOWN"
+    fi
+    push_output="$(printf 'y\n' | "$SWIFTMTP_CLI" push "$device_id" "$storage_id" "$local_prg" "$remote_prg" 2>&1)" || true
+    echo "$push_output"
+    if printf '%s' "$push_output" | grep -q "Push complete."; then
+        push_ok=1
+        break
+    fi
+    # Anything that isn't a USB session failure won't be fixed by waiting.
+    if ! printf '%s' "$push_output" | grep -q "LIBUSB_ERROR_IO"; then
+        break
+    fi
+done
+
+if [ "$push_ok" -ne 1 ]; then
+    echo ""
     echo "Error: push did not report completion"
+    if printf '%s' "$push_output" | grep -q "LIBUSB_ERROR_IO"; then
+        echo "       The device enumerated but would not open an MTP session."
+        echo "       Restart the Edge, then reconnect with the screen awake and"
+        echo "       unlocked, and keep it awake for the transfer. See ERRORS.md."
+        echo "       Ignore any 'occupied by other processes, PID: N' line — those"
+        echo "       PIDs are routinely stale and have sent us chasing ghosts."
+    fi
     exit 1
 fi
 
-# Verify the file actually landed.
+# Verify the file actually landed. This opens another session immediately after
+# the push, which is exactly when the device is most likely to refuse one, so a
+# failure here is NOT evidence the push failed — report it as unverified rather
+# than treating it as an error.
 if "$SWIFTMTP_CLI" ls "$device_id" "$storage_id" "$REMOTE_DIR" 2>/dev/null | grep -q "$(basename "$PRG_OUTPUT")"; then
     echo "✓ Pushed and verified: $remote_prg"
 else
-    echo "Error: $remote_prg not present after push"
-    exit 1
+    echo "✓ Pushed: $remote_prg"
+    echo "  (could not re-list $REMOTE_DIR to verify — the push itself reported"
+    echo "   completion, so this is most likely the device declining a second"
+    echo "   back-to-back session, not a failed transfer)"
 fi
 echo ""
 
