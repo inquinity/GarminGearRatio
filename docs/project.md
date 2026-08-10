@@ -131,3 +131,40 @@ needs to capture at higher rate, or in more detail than nRF Connect provides).
   `StepsData.errorReport` field that was never implemented (corrected); the
   `Debug`/`FrontRings`/`FrontTeeth`/`RearTeeth` properties are surfaced in
   settings but read by no source file (now annotated as reserved).
+- 2026-08-09 (later): **Probe built, deployed, and confirmed running on device.**
+  `Activity.Info` sampling added to `compute()` and rendered on the Test screen
+  as `A:R`/`A:F` rows alongside the BLE `Gear` row, with `null` (read, head unit
+  returned nothing) kept distinct from `--` (never sampled) and `n/a` (API
+  doesn't expose the fields). Version 1.0.1, build tag `B5`.
+
+  **Two deployment faults found and fixed**, both recorded in `ERRORS.md`:
+  1. A failing USB-C data cable. MTP enumeration succeeded while every session
+     open failed with `LIBUSB_ERROR_IO`; other MTP clients failed identically.
+     Swapping the cable fixed transfers.
+  2. `deploy.sh` passed a full remote *file* path to `swiftmtp-cli push`, which
+     treats that argument as a destination *directory*. Since 2026-07-31 it had
+     been creating `/GARMIN/Apps/di2steps.prg/` and writing the build inside it,
+     so the Edge — which scans for `.prg` files — never installed the app. The
+     verification step (`ls | grep -q di2steps.prg`) matched that directory and
+     reported success on every deploy. Now pushes to the directory and verifies
+     a *file* of the expected byte size.
+
+  Fixing the cable made transfers work and made the broken deploy look correct,
+  which is why the two took so long to separate.
+
+  **On-device status:** field installs and renders. Layout auto-fit verified at
+  three slot sizes — 480x800 full screen, 480x399 half, 239x160 quarter.
+
+  **First bench test — inconclusive, no fault indicated.** All `Activity.Info`
+  derailleur values read `null`, but Garmin's own built-in fields were blank at
+  the same time, so the head unit simply had no drivetrain data to give while
+  the bike was idle. Pedaling appears to matter. This neither confirms nor
+  refutes the teeth hypothesis. **Next step is a real ride**, comparing Garmin's
+  built-in "Rear cog position" / "Front chain position" against our `Gear` (BLE)
+  and `A:R`/`A:F` (`Activity.Info`) rows. The decisive signal is divergence:
+  ours null while Garmin shows numbers would mean our read is wrong; both
+  showing matching numbers would leave only the `t` (teeth) question open.
+
+  Noted: the Connect IQ BLE permission prompt appears on activity start, as
+  expected from the `BluetoothLowEnergy` manifest permission. If `Activity.Info`
+  proves sufficient for gear, dropping that permission removes the prompt.
