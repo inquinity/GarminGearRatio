@@ -96,9 +96,19 @@ echo "  device:  $device_id"
 echo "  storage: $storage_id"
 echo ""
 
-# swiftmtp-cli push needs an absolute local path and the full remote file path.
+# swiftmtp-cli push needs an absolute local path, and treats <remotePath> as the
+# destination DIRECTORY — it drops the file in under its own basename, creating
+# that path as a directory if it doesn't exist.
+#
+# Passing the full remote FILE path here is what broke deploys from 2026-07-31
+# to 2026-08-09: it created a directory `/GARMIN/Apps/di2steps.prg/` and wrote
+# the real .prg inside it. The Edge scans /GARMIN/Apps for .prg *files*, saw a
+# directory, and skipped it — so the field never appeared however many times we
+# "successfully" pushed. Pass the directory. See ERRORS.md.
 local_prg="$(cd "$(dirname "$PRG_OUTPUT")" && pwd)/$(basename "$PRG_OUTPUT")"
-remote_prg="$REMOTE_DIR/$(basename "$PRG_OUTPUT")"
+prg_name="$(basename "$PRG_OUTPUT")"
+remote_prg="$REMOTE_DIR/$prg_name"
+expected_size="$(wc -c < "$local_prg" | tr -d '[:space:]')"
 
 # push prompts "Overwrite? [y/n]" when the file already exists; feed 'y' so a
 # redeploy is non-interactive (the extra input is harmless on a first push).
@@ -118,7 +128,7 @@ for attempt in 1 2 3; do
         echo "  session failed; cooling down ${PUSH_COOLDOWN}s before retry $attempt/3..."
         sleep "$PUSH_COOLDOWN"
     fi
-    push_output="$(printf 'y\n' | "$SWIFTMTP_CLI" push "$device_id" "$storage_id" "$local_prg" "$remote_prg" 2>&1)" || true
+    push_output="$(printf 'y\n' | "$SWIFTMTP_CLI" push "$device_id" "$storage_id" "$local_prg" "$REMOTE_DIR" 2>&1)" || true
     echo "$push_output"
     if printf '%s' "$push_output" | grep -q "Push complete."; then
         push_ok=1
@@ -143,17 +153,36 @@ if [ "$push_ok" -ne 1 ]; then
     exit 1
 fi
 
-# Verify the file actually landed. This opens another session immediately after
-# the push, which is exactly when the device is most likely to refuse one, so a
-# failure here is NOT evidence the push failed — report it as unverified rather
-# than treating it as an error.
-if "$SWIFTMTP_CLI" ls "$device_id" "$storage_id" "$REMOTE_DIR" 2>/dev/null | grep -q "$(basename "$PRG_OUTPUT")"; then
-    echo "✓ Pushed and verified: $remote_prg"
-else
+# Verify the file actually landed, as a FILE of the expected SIZE.
+#
+# A bare `grep -q di2steps.prg` on the listing is not good enough: it matched a
+# stray *directory* of that name for nine days and reported "verified" on every
+# deploy while the app was never installed. `ls` renders directories as "<DIR>"
+# in the size column, so compare the size field instead of matching the name.
+#
+# This opens another session immediately after the push, which is exactly when
+# the device is most likely to refuse one, so a listing failure is NOT evidence
+# the push failed — report that as unverified rather than as an error.
+listing="$("$SWIFTMTP_CLI" ls "$device_id" "$storage_id" "$REMOTE_DIR" 2>/dev/null)" || true
+remote_size="$(printf '%s\n' "$listing" | awk -v name="$prg_name" '$NF == name { print $1; exit }')"
+
+if [ "$remote_size" = "$expected_size" ]; then
+    echo "✓ Pushed and verified: $remote_prg ($expected_size bytes)"
+elif [ "$remote_size" = "<DIR>" ]; then
+    echo "Error: $remote_prg is a DIRECTORY, not a file."
+    echo "       The Edge only loads .prg *files* from $REMOTE_DIR, so the app"
+    echo "       will not appear however many times you restart it. Remove it:"
+    echo "         $SWIFTMTP_CLI rm -r $device_id $storage_id $remote_prg"
+    echo "       then re-run this script."
+    exit 1
+elif [ -z "$remote_size" ]; then
     echo "✓ Pushed: $remote_prg"
     echo "  (could not re-list $REMOTE_DIR to verify — the push itself reported"
     echo "   completion, so this is most likely the device declining a second"
     echo "   back-to-back session, not a failed transfer)"
+else
+    echo "Error: $remote_prg is $remote_size bytes, expected $expected_size"
+    exit 1
 fi
 echo ""
 

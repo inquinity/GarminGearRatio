@@ -5,6 +5,62 @@ isn't re-diagnosed from scratch.
 
 ---
 
+## Deploy reports success but the data field never appears on the Edge
+
+**Seen:** 2026-07-31 through 2026-08-09. **Status:** RESOLVED (deploy.sh fixed).
+
+### Symptom
+
+`./deploy.sh` prints `Push complete.` and `✓ Pushed and verified`, the file is
+visibly present in `/GARMIN/Apps`, and the Edge is restarted — but "Di2 STEPS"
+never appears in the Connect IQ category of the data-screen editor. Restarting
+repeatedly changes nothing.
+
+### Root cause
+
+`swiftmtp-cli push <deviceId> <storageId> <localPath> <remotePath>` treats
+`<remotePath>` as the destination **directory**, and creates it if missing. It
+places the file inside under its own basename.
+
+`deploy.sh` passed the full remote *file* path (`/GARMIN/Apps/di2steps.prg`).
+swiftmtp therefore created a **directory** with that name and wrote the real
+build to `/GARMIN/Apps/di2steps.prg/di2steps.prg`. The Edge scans
+`/GARMIN/Apps` for `.prg` **files**, found a directory, and skipped it.
+
+The `push: 'di2steps.prg' already exists … Overwrite? [y/n]` prompt on every
+redeploy was matching that directory, not a previous build.
+
+### Why it went unnoticed for nine days
+
+The verification step was `ls "$REMOTE_DIR" | grep -q di2steps.prg`. That
+matches the stray directory perfectly, so every single deploy printed
+`✓ Pushed and verified` while nothing was ever installed. **A name match in a
+listing does not verify a deploy.** deploy.sh now compares the size field from
+`ls` against the local file's byte count, and fails loudly if it finds `<DIR>`.
+
+This also masked a genuinely separate problem — a failing USB-C data cable (see
+below). Fixing the cable made transfers work and made the deploy look correct,
+which is why the two faults took so long to separate. When a fix makes the
+symptom change but not disappear, suspect a second cause.
+
+### Recovery
+
+The name must be freed before a real file can be written there:
+
+```
+swiftmtp-cli rm -r <deviceId> <storageId> /GARMIN/Apps/di2steps.prg
+```
+
+then redeploy. Confirm the result is a **file** of the expected size:
+
+```
+swiftmtp-cli ls <deviceId> <storageId> /GARMIN/Apps
+            118268  2026-08-10T02:58:58.  di2steps.prg     <- correct
+<DIR>            -  2026-07-31T17:39:50.  di2steps.prg     <- broken
+```
+
+---
+
 ## MTP push fails: `OpenSession failed: LIBUSB_ERROR_IO`
 
 **First seen:** 2026-08-09, deploying di2steps 1.0.1 to the Edge 1050.
