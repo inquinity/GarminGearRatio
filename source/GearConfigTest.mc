@@ -95,6 +95,30 @@ function testTeethToCsvSingle(logger as Test.Logger) as Boolean {
     return $.teethToCsv([38] as Array<Number>).equals("38");
 }
 
+// ── inferChainrings: 0xFF means "no front derailleur", so one ring ───────────
+
+(:test)
+function testInferChainringsSentinelMeansOne(logger as Test.Logger) as Boolean {
+    return $.inferChainrings(0xFF) == 1;
+}
+
+(:test)
+function testInferChainringsDoubleReportsTwo(logger as Test.Logger) as Boolean {
+    return $.inferChainrings(2) == 2;
+}
+
+(:test)
+function testInferChainringsUnsampledIsNull(logger as Test.Logger) as Boolean {
+    // Must stay distinct from "we know it's 1" so the wizard doesn't act on a
+    // reading it never took.
+    return $.inferChainrings(null) == null;
+}
+
+(:test)
+function testInferChainringsRejectsZero(logger as Test.Logger) as Boolean {
+    return $.inferChainrings(0) == null;
+}
+
 // ── isPlausibleTeeth boundaries ──────────────────────────────────────────────
 
 (:test)

@@ -20,10 +20,33 @@ import Toybox.WatchUi;
 // Nothing is written until the final picker is accepted — cancelling at any
 // step leaves existing settings untouched.
 
-// Property holding the most recent rearDerailleurMax seen by the data field.
-// The wizard normally runs outside an activity, when Activity.Info has no live
-// values, so this is the only way to offer a sensible default.
-const LAST_REAR_MAX = "LastRearMax";
+// Drivetrain sizes most recently seen by the data field. The wizard normally
+// runs outside an activity, when Activity.Info has no live values, so these are
+// the only way it can know the drivetrain without asking.
+//
+// Both are detected: the cassette size directly (11 on this bike), and the
+// chainring count by inference — a front derailleur reports its own max, so the
+// 0xFF sentinel means there is none, i.e. a single ring. See
+// StepsData.chainrings(). The FrontRings setting is the manual override for the
+// case that inference gets wrong.
+const LAST_REAR_MAX  = "LastRearMax";
+const LAST_FRONT_MAX = "LastFrontMax";
+
+// Detected cassette size, or null if the field has never seen one.
+function detectedRearCogs() as Number? {
+    var stored = Properties.getValue($.LAST_REAR_MAX);
+    return (stored instanceof Lang.Number && stored >= 2) ? stored : null;
+}
+
+// Chainring count: what the bike reported, else the configured override, else 1.
+function chainringCount() as Number {
+    var detected = Properties.getValue($.LAST_FRONT_MAX);
+    if (detected instanceof Lang.Number && detected >= 1 && detected <= 2) {
+        return detected;
+    }
+    var configured = Properties.getValue("FrontRings");
+    return (configured instanceof Lang.Number && configured >= 1) ? configured : 1;
+}
 
 // ── Tooth picker ─────────────────────────────────────────────────────────────
 // A scrollable column of tooth counts 2..99. getValue() returns the tooth count
@@ -103,6 +126,10 @@ class TeethEntry {
 }
 
 // ── Step 0: status screen ────────────────────────────────────────────────────
+// OK goes straight to the tooth pickers, because the drivetrain is already
+// known: the cassette size comes from the head unit and the ring count from
+// settings. Only a bike the field has never seen ridden needs the cog-count
+// question, and that is the sole reason RearCogsMenuDelegate still exists.
 class GearSettingsDelegate extends WatchUi.BehaviorDelegate {
 
     function initialize() {
@@ -110,10 +137,17 @@ class GearSettingsDelegate extends WatchUi.BehaviorDelegate {
     }
 
     function onSelect() as Boolean {
-        var menu = new WatchUi.Menu2({:title => "Chainrings"});
-        menu.addItem(new WatchUi.MenuItem("1x", "Single chainring", 1, {}));
-        menu.addItem(new WatchUi.MenuItem("2x", "Double chainring", 2, {}));
-        WatchUi.pushView(menu, new FrontRingsMenuDelegate(), WatchUi.SLIDE_UP);
+        var cogs = $.detectedRearCogs();
+        if (cogs == null) {
+            // Never ridden with this field installed, so nothing to go on.
+            var menu = new WatchUi.Menu2({:title => "Rear Cogs"});
+            for (var n = 9; n <= 13; n++) {
+                menu.addItem(new WatchUi.MenuItem(n.toString() + "-speed", "", n, {}));
+            }
+            WatchUi.pushView(menu, new RearCogsMenuDelegate(), WatchUi.SLIDE_UP);
+            return true;
+        }
+        $.startToothEntry($.chainringCount(), cogs, WatchUi.SLIDE_UP);
         return true;
     }
 
@@ -123,8 +157,8 @@ class GearSettingsDelegate extends WatchUi.BehaviorDelegate {
     }
 }
 
-// ── Step 1: how many chainrings ──────────────────────────────────────────────
-class FrontRingsMenuDelegate extends WatchUi.Menu2InputDelegate {
+// ── Fallback: cassette size, only when nothing was ever detected ─────────────
+class RearCogsMenuDelegate extends WatchUi.Menu2InputDelegate {
 
     function initialize() {
         Menu2InputDelegate.initialize();
@@ -135,51 +169,7 @@ class FrontRingsMenuDelegate extends WatchUi.Menu2InputDelegate {
         if (!(id instanceof Lang.Number)) {
             return;
         }
-        var frontTotal = id as Number;
-
-        // Offer cog counts, marking the one the field last saw on the bike.
-        var lastMax = Properties.getValue(LAST_REAR_MAX);
-        var menu = new WatchUi.Menu2({:title => "Rear Cogs"});
-        for (var cogs = 9; cogs <= 13; cogs++) {
-            var note = (lastMax instanceof Lang.Number && lastMax == cogs)
-                ? "detected on bike" : "";
-            menu.addItem(new WatchUi.MenuItem(cogs.toString() + "-speed", note, cogs, {}));
-        }
-        WatchUi.pushView(menu, new RearCogsMenuDelegate(frontTotal), WatchUi.SLIDE_LEFT);
-    }
-
-    function onBack() as Void {
-        WatchUi.popView(WatchUi.SLIDE_DOWN);
-    }
-}
-
-// ── Step 2: how many cogs, then straight into the pickers ────────────────────
-class RearCogsMenuDelegate extends WatchUi.Menu2InputDelegate {
-
-    private var _frontTotal as Number;
-
-    function initialize(frontTotal as Number) {
-        Menu2InputDelegate.initialize();
-        _frontTotal = frontTotal;
-    }
-
-    function onSelect(item as WatchUi.MenuItem) as Void {
-        var id = item.getId();
-        if (!(id instanceof Lang.Number)) {
-            return;
-        }
-        var entry = new TeethEntry(_frontTotal, id as Number);
-
-        // Same topology as what's saved → prefill, so this doubles as a review.
-        // A different topology starts fresh; old teeth wouldn't line up anyway.
-        var current = new GearConfig();
-        if (current.frontTeeth.size() == entry.frontTotal
-            && current.rearTeeth.size() == entry.rearTotal) {
-            entry.existingFrontTeeth = current.frontTeeth;
-            entry.existingRearTeeth  = current.rearTeeth;
-        }
-
-        $.showToothPicker(entry, false, 0, entry.startValueFor(false, 0, null));
+        $.startToothEntry($.chainringCount(), id as Number, WatchUi.SLIDE_LEFT);
     }
 
     function onBack() as Void {
@@ -240,7 +230,27 @@ class CogPickerDelegate extends WatchUi.PickerDelegate {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function showToothPicker(entry as TeethEntry, isRear as Boolean, position as Number, startValue as Number?) as Void {
+// Build the wizard state for a known drivetrain and open the first picker.
+// Prefills from the saved config when the topology matches, so re-running the
+// wizard doubles as a review: page through accepting everything and nothing
+// changes.
+function startToothEntry(frontTotal as Number, rearTotal as Number, transition as WatchUi.SlideType) as Void {
+    var entry = new TeethEntry(frontTotal, rearTotal);
+
+    var current = new GearConfig();
+    if (current.frontTeeth.size() == frontTotal && current.rearTeeth.size() == rearTotal) {
+        entry.existingFrontTeeth = current.frontTeeth;
+        entry.existingRearTeeth  = current.rearTeeth;
+    }
+
+    var start = entry.startValueFor(false, 0, null);
+    var options = $.toothPickerOptions(entry, false, 0, start);
+    WatchUi.pushView(new WatchUi.Picker(options),
+                     new CogPickerDelegate(entry, false, 0),
+                     transition);
+}
+
+function toothPickerOptions(entry as TeethEntry, isRear as Boolean, position as Number, startValue as Number?) as Dictionary {
     var options = {
         :title => new WatchUi.Text({
             :text => $.toothPickerLabel(entry, isRear, position),
@@ -255,7 +265,11 @@ function showToothPicker(entry as TeethEntry, isRear as Boolean, position as Num
         // ToothPickerFactory.getValue(index) = index + 2, so invert it here.
         options[:defaults] = [(startValue as Number) - 2];
     }
-    WatchUi.switchToView(new WatchUi.Picker(options),
+    return options;
+}
+
+function showToothPicker(entry as TeethEntry, isRear as Boolean, position as Number, startValue as Number?) as Void {
+    WatchUi.switchToView(new WatchUi.Picker($.toothPickerOptions(entry, isRear, position, startValue)),
                          new CogPickerDelegate(entry, isRear, position),
                          WatchUi.SLIDE_LEFT);
 }

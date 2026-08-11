@@ -67,6 +67,25 @@ function sortDescending(teeth as Array<Number>) as Array<Number> {
     return sortAscending(teeth).reverse() as Array<Number>;
 }
 
+// Number of chainrings, inferred from Activity.Info's frontDerailleurMax.
+//
+// A front derailleur that exists reports its own max (2 for a double), so the
+// 0xFF no-data sentinel means there is no front derailleur to report — i.e. a
+// single ring. This is an inference, not a documented guarantee: a 2x that
+// failed to report would be read as 1x. There is no way to distinguish those,
+// and the FrontRings setting stays available as a manual override.
+//
+// Returns null when nothing has been sampled, so callers can tell "we don't
+// know yet" from "we know it's 1".
+function inferChainrings(frontMax as Number?) as Number? {
+    if (frontMax == null) {
+        return null;
+    } else if (frontMax == 0xFF) {
+        return 1;
+    }
+    return (frontMax >= 1) ? frontMax : null;
+}
+
 // Render teeth back to the CSV form stored in Properties.
 function teethToCsv(teeth as Array<Number>) as String {
     var s = "";

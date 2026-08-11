@@ -52,22 +52,25 @@ class StepsData {
         rearMax    = info.rearDerailleurMax;
         rearSize   = info.rearDerailleurSize;
 
-        rememberRearMax();
+        remember($.LAST_REAR_MAX, valid(rearMax));
+        remember($.LAST_FRONT_MAX, $.inferChainrings(frontMax));
     }
 
-    // Persist the cassette size the moment we see it. The settings wizard
-    // normally runs with no activity recording, when Activity.Info has nothing
-    // live, so this is the only way it can offer "detected on bike" instead of
-    // asking the rider to remember. Written only on change, to avoid a
-    // Properties write every second.
-    private function rememberRearMax() as Void {
-        var max = valid(rearMax);
+    // Persist a detected drivetrain size the moment we see it. The settings
+    // wizard normally runs with no activity recording, when Activity.Info has
+    // nothing live, so this is the only way it can know the drivetrain without
+    // asking the rider. Written only on change, to avoid a Properties write
+    // every second.
+    //
+    // In practice the rear lands (11) and the front never does — a 1x bike
+    // reports 0xFF, which valid() filters out.
+    private function remember(key as String, max as Number?) as Void {
         if (max == null || max < 1) {
             return;
         }
-        var stored = Properties.getValue($.LAST_REAR_MAX);
+        var stored = Properties.getValue(key);
         if (!(stored instanceof Number) || stored != max) {
-            Properties.setValue($.LAST_REAR_MAX, max);
+            Properties.setValue(key, max);
         }
     }
 
