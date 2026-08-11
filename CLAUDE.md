@@ -126,11 +126,39 @@ the push to load the data field.
 
 ## Testing
 
-**The data path cannot be exercised in the simulator.** `Activity.Info`'s
-derailleur fields have no simulated drivetrain behind them, so they read as
-never-sampled. The simulator verifies exactly two things: it compiles, and the
-Test screen lays out at the field's slot size. Everything about data retrieval
-is device-only, on the real Edge 1050 + bike.
+Split the app in two when deciding where to test something: the **arithmetic**
+(teeth → ratio) is fully testable off the bike, the **position source**
+(`Activity.Info`) is not testable at all off the bike.
+
+### Unit tests (simulator) — covers all the ratio logic
+
+`ratio()` takes gear positions as plain parameters, so the entire tooth-count
+and ratio path can be tested without hardware. `source/GearConfigTest.mc` covers
+CSV parsing, `sortDescending` normalisation, tooth-plausibility bounds, lookup
+by position, ratio arithmetic, 2-decimal rounding, and null propagation.
+
+```bash
+SDK="$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-9.2.0-2026-06-09-92a1605b2"
+KEY="$HOME/Library/Mobile Documents/com~apple~CloudDocs/Certs/garmin_developer_key.der"
+"$SDK/bin/monkeyc" -t -d edge1050 -f monkey.jungle -o bin/di2steps-test.prg -y "$KEY"
+open "$SDK/bin/ConnectIQ.app"
+"$SDK/bin/monkeydo" bin/di2steps-test.prg edge1050 -t
+```
+
+The simulator must already be running before `monkeydo`. 20 tests as of
+2026-08-09, all passing.
+
+### What the simulator CANNOT test
+
+**`Activity.Info`'s derailleur fields have no simulated drivetrain**, so gear
+positions read as never-sampled and the Ratio row stays `--` no matter what
+teeth are configured. That means position tracking, the draw-time sampling fix
+for the ~1s lag, and end-to-end ratio against real gears are **device-only**, on
+the real Edge 1050 + bike.
+
+Untried idea if that ever needs closing: play a recorded ride FIT (from
+`/GARMIN/Activities`) back through the simulator and see whether Connect IQ
+surfaces derailleur data from playback. Unverified — it may simply not populate.
 
 Note `compute()` only runs while an activity is recording, so every value reads
 `--` until you actually start one. That is expected, not a fault.
