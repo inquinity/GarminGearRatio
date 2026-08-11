@@ -35,9 +35,15 @@ class GearSettingsView extends WatchUi.View {
         dc.drawText(w / 2, h * 7 / 8, Graphics.FONT_TINY,  hint,              Graphics.TEXT_JUSTIFY_CENTER);
     }
 
-    // Teeth as "38T" / "51..12 (11)" / "not set". The rear is summarised by its
-    // range and count rather than listed: eleven values do not fit on a line,
-    // and range+count is enough to spot a wrong or truncated entry.
+    // Teeth as "38T" / "11..50 (11)" / "not set". Summarised by range and count
+    // rather than listed: eleven values do not fit on a line, and range+count is
+    // enough to spot a wrong or truncated entry.
+    //
+    // Always rendered SMALLEST..LARGEST, which is how drivetrains are described
+    // everywhere ("11-50 cassette"), regardless of how the teeth are stored.
+    // Internally the rear is held largest-first because position 1 is the
+    // easiest gear — that ordering is load-bearing for the ratio lookup and must
+    // not be "fixed" to match this display.
     private function summarise(teeth as Array<Number>) as String {
         var n = teeth.size();
         if (n == 0) {
@@ -45,6 +51,17 @@ class GearSettingsView extends WatchUi.View {
         } else if (n == 1) {
             return teeth[0].toString() + "T";
         }
-        return teeth[0].toString() + ".." + teeth[n - 1].toString() + " (" + n.toString() + ")";
+
+        var smallest = teeth[0];
+        var largest  = teeth[0];
+        for (var i = 1; i < n; i++) {
+            if (teeth[i] < smallest) {
+                smallest = teeth[i];
+            }
+            if (teeth[i] > largest) {
+                largest = teeth[i];
+            }
+        }
+        return smallest.toString() + ".." + largest.toString() + " (" + n.toString() + ")";
     }
 }
