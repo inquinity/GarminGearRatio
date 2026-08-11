@@ -1,0 +1,123 @@
+import Toybox.Application.Properties;
+import Toybox.Lang;
+
+// Drivetrain tooth counts, entered by the rider in app settings.
+//
+// These MUST be user-entered. Activity.Info exposes frontDerailleurSize and
+// rearDerailleurSize in teeth, but on the SC-EM800 they are useless for this:
+// the rear reports a constant (12 observed across every gear, never changing
+// with position) and the front reports 0. Verified on-device 2026-08-09 — see
+// docs/project.md. Only the POSITION fields track shifts.
+//
+// parseTeethCsv is ported from ../GarminGearRatio/source/GearConfig.mc, which
+// solves the same problem for a raw ANT+ Di2 channel.
+//
+// INDEX CONVENTION — confirmed on this bike 2026-08-09: **rear position 1 is
+// the easiest gear, i.e. the LARGEST cog**, descending to the smallest at
+// position 11. Note this is the opposite of GarminGearRatio's assumption, which
+// takes position 1 as the smallest/hardest cog (see its DESIGN.md); do not
+// copy that project's sortAscending for the rear.
+//
+// Because the mapping is monotonic by physics, rear teeth are sorted
+// largest-first on load. Entry order therefore cannot silently produce a
+// wrong ratio.
+
+// Parse a comma-separated string of integers into an Array<Number>.
+// Tokens that don't parse as integers are silently skipped.
+function parseTeethCsv(csv as String) as Array<Number> {
+    var result = [] as Array<Number>;
+    var len = csv.length();
+    var start = 0;
+    for (var i = 0; i <= len; i++) {
+        var ch = (i < len) ? csv.substring(i, i + 1) : ",";
+        if (ch != null && ch.equals(",")) {
+            var part = csv.substring(start, i);
+            if (part != null) {
+                var n = part.toNumber();
+                if (n != null) {
+                    result.add(n);
+                }
+            }
+            start = i + 1;
+        }
+    }
+    return result;
+}
+
+// A plausible bicycle sprocket. Rejects transcription slips like "0" or "380".
+function isPlausibleTeeth(t as Number) as Boolean {
+    return t >= 2 && t <= 99;
+}
+
+// Sorted largest-first. Rear position 1 is the easiest gear (largest cog), so
+// this maps entry order onto position order regardless of how the rider typed
+// the CSV. Cassette tooth counts are strictly decreasing by position, so this
+// is a normalisation, not a guess.
+function sortDescending(teeth as Array<Number>) as Array<Number> {
+    var sorted = [] as Array<Number>;
+    sorted.addAll(teeth);
+    sorted.sort(null);
+    return sorted.reverse() as Array<Number>;
+}
+
+// Tooth counts loaded from application Properties.
+//
+// Unlike GearRatio's equivalent, this does NOT validate the rear count against
+// a configured cassette size: rearDerailleurMax arrives live from Activity.Info
+// (11 on this bike), so the expected count isn't known until the head unit
+// reports it. Validation is therefore per-lookup rather than up front, which
+// also means a partially-filled config still shows whatever it can.
+class GearConfig {
+
+    public var frontTeeth as Array<Number> = [] as Array<Number>;
+    public var rearTeeth  as Array<Number> = [] as Array<Number>;
+    public var frontRings as Number        = 1;
+
+    function initialize() {
+        load();
+    }
+
+    function load() as Void {
+        var rings = Properties.getValue("FrontRings");
+        frontRings = (rings instanceof Number && rings > 0) ? rings : 1;
+
+        var frontStr = Properties.getValue("FrontTeeth");
+        var rearStr  = Properties.getValue("RearTeeth");
+
+        // Front is left in entry order: with a single chainring there is
+        // nothing to order, and for 2x we have no confirmed convention.
+        frontTeeth = parseTeethCsv(frontStr instanceof String ? frontStr : "");
+        rearTeeth  = sortDescending(parseTeethCsv(rearStr instanceof String ? rearStr : ""));
+    }
+
+    // Teeth for a 1-based gear position, or null when unconfigured or out of
+    // range. Null is a real answer here — it means "the rider hasn't told us" —
+    // and the caller renders it distinctly rather than substituting a guess.
+    private function teethAt(teeth as Array<Number>, position as Number?) as Number? {
+        if (position == null || position < 1 || position > teeth.size()) {
+            return null;
+        }
+        var t = teeth[position - 1];
+        return isPlausibleTeeth(t) ? t : null;
+    }
+
+    function frontTeethAt(position as Number?) as Number? {
+        return teethAt(frontTeeth, position);
+    }
+
+    function rearTeethAt(position as Number?) as Number? {
+        return teethAt(rearTeeth, position);
+    }
+
+    // Gear ratio: front teeth / rear teeth. This is the "power multiplier" —
+    // how far the wheel turns per crank revolution. Null when either end is
+    // unconfigured, so the UI can say so instead of showing a fabricated 0.00.
+    function ratio(frontPos as Number?, rearPos as Number?) as Float? {
+        var tf = frontTeethAt(frontPos);
+        var tr = rearTeethAt(rearPos);
+        if (tf == null || tr == null || tr == 0) {
+            return null;
+        }
+        return tf.toFloat() / tr.toFloat();
+    }
+}

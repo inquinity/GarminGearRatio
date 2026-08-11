@@ -1,54 +1,28 @@
 import Toybox.Activity;
 import Toybox.Lang;
-import Toybox.StringUtil;
 
-// Decoded state from the SC-EM800's multiplexed 2AC1 characteristic, plus a
-// small ring of the last raw packet seen per type-tag for the TEST screen.
+// Drivetrain state read from Toybox.Activity.Info.
 //
-// Wire format is documented in docs/SCEM800-BLE-protocol.md. Each notification's
-// FIRST byte is a type tag; payload length is fixed per type. We branch on the
-// tag (more robust than branching on size) and pull known offsets.
+// The head unit decodes the STEPS drivetrain from its own sensor pairing and
+// hands the result to any data field, with no permission required. That is the
+// app's only data source: the Shimano BLE path was removed on 2026-08-09 after
+// an on-device ride showed it added nothing this field needs (see
+// docs/project.md).
 //
-//   tag 0x00 (18B): gear    -> byte[5]=current gear, byte[6]=max gear
-//   tag 0x02 (10B): mode    -> byte[1]=assist mode, byte[2..3]=speed/10,
-//                              byte[4]=assist level, byte[5]=cadence
-//   tag 0x05 (13B): rider profile name (ASCII from byte 3)
-//   tags 0x01/0x03/0x04/0x06: not decoded (recorded raw for diagnostics only)
+// Three states per field, and the difference matters when diagnosing:
+//   supported == false  -> the API doesn't expose these fields on this device
+//   read == false       -> not sampled yet (no activity running)
+//   value == null       -> sampled, and the head unit had nothing to report
 //
-// -1 (or -1.0) means "not yet received" so the UI can show a placeholder
-// instead of a stale/fake value.
+// Position fields track shifts correctly. The SIZE (teeth) fields do not: the
+// rear reports a constant 12 regardless of gear and the front reports 0, so
+// tooth counts come from GearConfig instead. Size is still captured here purely
+// so the Test screen can show it — if a future firmware starts reporting real
+// teeth, this is where it would show up first.
 class StepsData {
 
-    public var gear        as Number = -1;
-    public var maxGear     as Number = -1;
-    public var assistMode  as Number = -1;
-    public var speed       as Float  = -1.0;   // km/h or mph tenths — units TBD on-device
-    public var cadence     as Number = -1;
-    public var assistLevel as Number = -1;
-    public var battery     as Number = -1;     // %, from GATT battery service
-    public var profileName as String? = null;
-
-    // tag (Number) => raw byte-array copy of the last packet of that type.
-    // Bounded at one entry per known tag, so this stays tiny.
-    public var lastPackets as Dictionary = {};
-
-    // ── Activity.Info drivetrain (second, independent data source) ────────────
-    //
-    // The head unit decodes STEPS gear position itself and exposes it to any
-    // data field with no permission at all. Kept in its own block, deliberately
-    // NOT merged into gear/maxGear above, so the two sources can be compared on
-    // the Test screen instead of one silently masking the other.
-    //
-    // Three states, and the difference between the last two is the entire point
-    // of this probe — do not collapse them:
-    //   activitySupported == false  -> the API doesn't expose these fields here
-    //   activityRead == false       -> not sampled yet
-    //   value == null               -> sampled, and the head unit had nothing
-    //
-    // `…Size` is teeth. Garmin's own Gear Ratio field renders blank on this
-    // bike, so the expectation is that both Size fields come back null.
-    public var activitySupported as Boolean = false;
-    public var activityRead      as Boolean = false;
+    public var supported as Boolean = false;
+    public var read      as Boolean = false;
 
     public var frontIndex as Number? = null;
     public var frontMax   as Number? = null;
@@ -60,16 +34,15 @@ class StepsData {
     function initialize() {
     }
 
-    // Sample the derailleur fields from the per-second Activity.Info. Guarded
-    // with `has` so a device/API level without them degrades to "n/a" instead
-    // of throwing.
+    // Sample the derailleur fields. Guarded with `has` so a device or API level
+    // without them degrades to "n/a" rather than throwing.
     function onActivityInfo(info as Activity.Info) as Void {
         if (!(info has :rearDerailleurIndex)) {
-            activitySupported = false;
+            supported = false;
             return;
         }
-        activitySupported = true;
-        activityRead      = true;
+        supported = true;
+        read      = true;
 
         frontIndex = info.frontDerailleurIndex;
         frontMax   = info.frontDerailleurMax;
@@ -79,70 +52,25 @@ class StepsData {
         rearSize   = info.rearDerailleurSize;
     }
 
-    // Parse one raw notification payload from the mode/gear characteristic.
-    function onPacket(value as ByteArray?) as Void {
-        if (value == null || value.size() == 0) {
-            return;
-        }
-        var tag = value[0];
-        lastPackets[tag] = value.slice(0, value.size());   // keep a copy for TEST view
-
-        if (tag == 0x00 && value.size() >= 7) {
-            gear    = value[5];
-            maxGear = value[6];
-        } else if (tag == 0x02 && value.size() >= 6) {
-            assistMode  = value[1];
-            speed       = (((value[3] << 8) | value[2]).toFloat()) / 10.0;
-            assistLevel = value[4];
-            cadence     = value[5];
-        } else if (tag == 0x05 && value.size() > 3) {
-            profileName = asciiZ(value, 3);
-        }
+    // 0xFF is the no-data sentinel, seen on the front of this 1x bike as
+    // "255/255". Treat it as absent rather than as gear 255.
+    private function valid(n as Number?) as Number? {
+        return (n == null || n == 0xFF) ? null : n;
     }
 
-    // Clear live values on disconnect so the UI stops showing the last-known
-    // gear as if it were current. Battery/profile are left as last-known.
-    function onDisconnect() as Void {
-        gear        = -1;
-        maxGear     = -1;
-        assistMode  = -1;
-        speed       = -1.0;
-        cadence     = -1;
-        assistLevel = -1;
+    function rearPosition() as Number? {
+        return valid(rearIndex);
     }
 
-    function hasGear() as Boolean {
-        return gear > 0 && maxGear > 0;
-    }
-
-    // Build "AA BB CC" hex for a stored raw packet, or "" if none seen yet.
-    function hexFor(tag as Number) as String {
-        var v = lastPackets[tag];
-        if (v == null) {
-            return "";
+    // Front position, with a fallback that matters on a 1x drivetrain: there is
+    // no front derailleur to report, so Activity.Info sends 255/255. If the
+    // rider has configured a single chainring, position 1 is the only
+    // possibility and is more useful than showing nothing.
+    function frontPosition(config as GearConfig) as Number? {
+        var live = valid(frontIndex);
+        if (live != null) {
+            return live;
         }
-        try {
-            return StringUtil.convertEncodedString(v, {
-                :fromRepresentation => StringUtil.REPRESENTATION_BYTE_ARRAY,
-                :toRepresentation   => StringUtil.REPRESENTATION_STRING_HEX
-            }).toUpper();
-        } catch (e) {
-            return "?";
-        }
-    }
-
-    // Decode a NUL-terminated ASCII run starting at `start`.
-    private function asciiZ(value as ByteArray, start as Number) as String {
-        var s = "";
-        for (var i = start; i < value.size(); i++) {
-            var b = value[i];
-            if (b == 0x00) {
-                break;
-            }
-            if (b >= 0x20 && b < 0x7F) {
-                s += (b.toChar()).toString();
-            }
-        }
-        return s;
+        return (config.frontRings == 1) ? 1 : null;
     }
 }

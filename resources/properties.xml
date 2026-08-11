@@ -2,35 +2,28 @@
 <properties>
     <!-- ── Which screen to render ───────────────────────────────────────────
          Mirrors the DisplayMode enum in Di2StepsView.mc:
-           0 = RIDE        gear / ratio / assist mode (replaces a Di2 page)
+           0 = RIDE        gear / ratio (rider-facing)
            1 = GEAR_CONFIG drivetrain topology + tooth counts
-           2 = TEST        name/value table of every decoded field (diagnostics)
-         Defaults to TEST while we are still proving data retrieval end-to-end. -->
+           2 = TEST        name/value table of every field (diagnostics)
+         Defaults to TEST while we are still proving the numbers are right. -->
     <property id="DisplayMode" type="Number">2</property>
 
-    <!-- RESERVED — declared and shown in settings, but no source file reads it.
-         Intended: write raw BLE packets into the FIT file for after-the-ride
-         debugging (Stage 5). Off by default so it costs no memory/battery.    -->
-    <property id="Debug" type="Boolean">false</property>
+    <!-- ── Drivetrain tooth counts (user-entered) ───────────────────────────
+         These MUST be entered by hand. Activity.Info does expose teeth via
+         frontDerailleurSize / rearDerailleurSize, but on the SC-EM800 they are
+         unusable: the rear reports a constant 12 regardless of gear, and the
+         front reports 0. Only the POSITION fields track shifts. Verified
+         on-device 2026-08-09 — see docs/project.md.
 
-    <!-- ── Drivetrain ───────────────────────────────────────────────────────
-         RESERVED — declared and shown in settings, but no source file reads
-         these yet. Ebikes are usually 1x. Rear cog COUNT is known live (max
-         gear from the BLE stream, and rearDerailleurMax from Activity.Info).
+         Enter teeth as CSV. Rear position 1 is the EASIEST gear — the largest
+         cog — confirmed on this bike 2026-08-09. Rear values are sorted
+         largest-first on load, so entry order does not matter and cannot
+         silently produce an inverted ratio.
 
-         Whether the tooth VALUES must be user-entered is currently under test:
-         Activity.Info also exposes frontDerailleurSize/rearDerailleurSize in
-         teeth. If those return real values on this bike, these three settings
-         are unnecessary and should be removed; if they return null (expected,
-         given Garmin's own Gear Ratio field renders blank), they get wired up
-         and GarminGearRatio's GearConfig.mc parsing is the thing to reuse.    -->
+         Ebikes are usually 1x, so FrontRings is normally 1 and FrontTeeth is a
+         single value. Rear cog COUNT is known live (rearDerailleurMax), so it
+         is not configured here — only the tooth values are.                  -->
     <property id="FrontRings" type="Number">1</property>
     <property id="FrontTeeth" type="String"></property>
     <property id="RearTeeth"  type="String"></property>
-
-    <!-- ── Bike identity ────────────────────────────────────────────────────
-         LastMAC is stored automatically after first connect. Enable LastLock
-         to only ever reconnect to that saved bike.                            -->
-    <property id="LastLock" type="Boolean">false</property>
-    <property id="LastMAC"  type="String"></property>
 </properties>
