@@ -1,4 +1,5 @@
 import Toybox.Activity;
+import Toybox.Application.Properties;
 import Toybox.Lang;
 
 // Drivetrain state read from Toybox.Activity.Info.
@@ -50,6 +51,24 @@ class StepsData {
         rearIndex  = info.rearDerailleurIndex;
         rearMax    = info.rearDerailleurMax;
         rearSize   = info.rearDerailleurSize;
+
+        rememberRearMax();
+    }
+
+    // Persist the cassette size the moment we see it. The settings wizard
+    // normally runs with no activity recording, when Activity.Info has nothing
+    // live, so this is the only way it can offer "detected on bike" instead of
+    // asking the rider to remember. Written only on change, to avoid a
+    // Properties write every second.
+    private function rememberRearMax() as Void {
+        var max = valid(rearMax);
+        if (max == null || max < 1) {
+            return;
+        }
+        var stored = Properties.getValue($.LAST_REAR_MAX);
+        if (!(stored instanceof Number) || stored != max) {
+            Properties.setValue($.LAST_REAR_MAX, max);
+        }
     }
 
     // 0xFF is the no-data sentinel, seen on the front of this 1x bike as

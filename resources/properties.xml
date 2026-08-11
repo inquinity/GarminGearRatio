@@ -26,4 +26,11 @@
     <property id="FrontRings" type="Number">1</property>
     <property id="FrontTeeth" type="String"></property>
     <property id="RearTeeth"  type="String"></property>
+
+    <!-- Written by the data field whenever Activity.Info reports
+         rearDerailleurMax; read by the on-device wizard so it can pre-mark the
+         detected cassette size. The wizard normally runs with no activity
+         recording, when Activity.Info has nothing live to offer. Not shown in
+         the settings UI — it is a cache, not a preference.                    -->
+    <property id="LastRearMax" type="Number">0</property>
 </properties>

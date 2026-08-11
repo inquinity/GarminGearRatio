@@ -49,15 +49,34 @@ function isPlausibleTeeth(t as Number) as Boolean {
     return t >= 2 && t <= 99;
 }
 
+// Sorted smallest-first. Front position 1 is the easiest gear — the SMALL ring
+// — so chainrings ascend by position. Only matters for 2x; a single ring sorts
+// to itself.
+function sortAscending(teeth as Array<Number>) as Array<Number> {
+    var sorted = [] as Array<Number>;
+    sorted.addAll(teeth);
+    sorted.sort(null);
+    return sorted;
+}
+
 // Sorted largest-first. Rear position 1 is the easiest gear (largest cog), so
 // this maps entry order onto position order regardless of how the rider typed
 // the CSV. Cassette tooth counts are strictly decreasing by position, so this
 // is a normalisation, not a guess.
 function sortDescending(teeth as Array<Number>) as Array<Number> {
-    var sorted = [] as Array<Number>;
-    sorted.addAll(teeth);
-    sorted.sort(null);
-    return sorted.reverse() as Array<Number>;
+    return sortAscending(teeth).reverse() as Array<Number>;
+}
+
+// Render teeth back to the CSV form stored in Properties.
+function teethToCsv(teeth as Array<Number>) as String {
+    var s = "";
+    for (var i = 0; i < teeth.size(); i++) {
+        if (i > 0) {
+            s = s + ",";
+        }
+        s = s + teeth[i].toString();
+    }
+    return s;
 }
 
 // Tooth counts loaded from application Properties.
@@ -84,9 +103,10 @@ class GearConfig {
         var frontStr = Properties.getValue("FrontTeeth");
         var rearStr  = Properties.getValue("RearTeeth");
 
-        // Front is left in entry order: with a single chainring there is
-        // nothing to order, and for 2x we have no confirmed convention.
-        frontTeeth = parseTeethCsv(frontStr instanceof String ? frontStr : "");
+        // Position 1 is the easiest gear on both axes: small ring at the front,
+        // large cog at the rear. Sorting on load means a hand-typed CSV in any
+        // order maps onto positions correctly.
+        frontTeeth = sortAscending(parseTeethCsv(frontStr instanceof String ? frontStr : ""));
         rearTeeth  = sortDescending(parseTeethCsv(rearStr instanceof String ? rearStr : ""));
     }
 

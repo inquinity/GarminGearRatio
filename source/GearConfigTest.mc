@@ -60,6 +60,41 @@ function testSortDescendingSingleValue(logger as Test.Logger) as Boolean {
     return r.size() == 1 && r[0] == 38;
 }
 
+// ── sortAscending: front position 1 is the small (easiest) ring ──────────────
+
+(:test)
+function testSortAscendingPutsSmallRingFirst(logger as Test.Logger) as Boolean {
+    var r = $.sortAscending([50, 34] as Array<Number>);
+    return r[0] == 34 && r[1] == 50;
+}
+
+// ── teethToCsv round-trips through parseTeethCsv ─────────────────────────────
+
+(:test)
+function testTeethToCsvRoundTrip(logger as Test.Logger) as Boolean {
+    var original = [51, 45, 39, 33, 28, 24, 21, 18, 16, 14, 12] as Array<Number>;
+    var back = $.parseTeethCsv($.teethToCsv(original));
+    if (back.size() != original.size()) {
+        return false;
+    }
+    for (var i = 0; i < original.size(); i++) {
+        if (back[i] != original[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+(:test)
+function testTeethToCsvEmpty(logger as Test.Logger) as Boolean {
+    return $.teethToCsv([] as Array<Number>).equals("");
+}
+
+(:test)
+function testTeethToCsvSingle(logger as Test.Logger) as Boolean {
+    return $.teethToCsv([38] as Array<Number>).equals("38");
+}
+
 // ── isPlausibleTeeth boundaries ──────────────────────────────────────────────
 
 (:test)

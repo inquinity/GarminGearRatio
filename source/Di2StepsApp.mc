@@ -22,9 +22,9 @@ class Di2StepsApp extends Application.AppBase {
         return [_view];
     }
 
-    // An on-device tooth-count wizard would be returned here.
+    // On-device tooth-count wizard, reachable from the field's settings.
     function getSettingsView() as [WatchUi.Views] or [WatchUi.Views, WatchUi.InputDelegates] or Null {
-        return null;
+        return [new GearSettingsView(), new GearSettingsDelegate()];
     }
 
     function onSettingsChanged() as Void {
