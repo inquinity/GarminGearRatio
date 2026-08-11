@@ -1,77 +1,83 @@
 # di2steps — Connect IQ data field for Shimano STEPS (SC-EM800)
 
-Reads the SC-EM800's shifting/assist data and renders it as a Garmin data field.
-Sibling to **GearRatio** (`../GarminGearRatio`), which reads gear position from a
-raw ANT+ Di2 channel; this app targets a bike where that Di2 channel is not
-exposed but the STEPS BLE stream is.
+Shows drivetrain gear positions and the resulting **gear ratio** (the "power
+multiplier") as a Garmin data field, for a Shimano STEPS (SC-EM800) bike.
+Sibling to **GearRatio** (`../GarminGearRatio`), which solves the same problem
+from a raw ANT+ Di2 channel.
 
-- **Wire format (source of truth):** `docs/SCEM800-BLE-protocol.md`
-- **Architecture / plan:** `~/.claude/plans/we-are-creating-a-polymorphic-quail.md`
-- **BLE reference impls (kept out of this repo):**
-  - **emtb** (original): `markdotai/emtb` at `/Users/robert/dev/oss/emtb` — the proven BLE 
-    state machine our `ShimanoBleDelegate.mc` is ported from.
-  - **ebikeDataField** (updated/derivative): `MarkusDatgloi/ebikeDataField` at `/Users/robert/dev/oss/ebikeDataField` — 
-    fixes for Garmin CIQ BLE profile registration bug (reports "ErrPrf_N" when profiles fail), 
-    best practices for multi-device Shimano STEPS data fields.
+- **Status log / decisions:** `docs/project.md`
+- **Historical BLE wire format:** `docs/SCEM800-BLE-protocol.md` (no longer used
+  by this app — see below)
 
 ## Data sources
 
-There are **two independent paths** into this app. They are not alternatives to
-each other — each carries data the other does not.
-
-**1. Shimano BLE stream** (`0x18EF` service, `2AC1` notify characteristic,
-multiplexed by a leading type-tag byte; permission `BluetoothLowEnergy`).
-Owned by `ShimanoBleDelegate.mc`, decoded in `StepsData.onPacket`. Carries
-assist mode, speed, cadence, assist level, rider profile name, plus gear /
-max-gear. Battery comes from the standard GATT battery service (`0x180F`/`0x2A19`),
-not the multiplexed characteristic.
-
-**2. `Toybox.Activity.Info` derailleur fields** — `@since` API 2.1.0, supported
-on `edge1050`, and requiring **no permission at all**:
+**One source: `Toybox.Activity.Info`.** `@since` API 2.1.0, supported on
+`edge1050`, requiring **no permission at all**:
 
 ```
 info.frontDerailleurIndex   info.frontDerailleurMax   info.frontDerailleurSize
 info.rearDerailleurIndex    info.rearDerailleurMax    info.rearDerailleurSize
 ```
 
-The head unit decodes these from its own STEPS pairing, independent of anything
-this app does. They are what Garmin's built-in "Rear cog position" (`1/11`) and
-"Front chain position" (`1/1`) fields render, and `…Size` is teeth count. On the
-SC-EM800 the built-in Gear Ratio field renders blank, which is the expected
-symptom of both `…Size` fields arriving as `null` — **this is currently a
-hypothesis under test**, see the Test screen and `docs/project.md`.
+The head unit decodes these from its own STEPS pairing. They are what Garmin's
+built-in "Rear cog position" and "Front chain position" fields render.
 
-**Ruled out: `AntPlus.Shifting`.** The 9.2.0 SDK doc for `getShiftingStatus()`
-states verbatim that it "Will not provide status for Shimano shifting systems."
-Do not re-investigate it. Its `DerailleurStatus` shift-failure counters are the
-only drivetrain data no other path exposes, and they are unavailable here.
+**Measured behaviour on this bike (2026-08-09, on-device):**
+
+| Field | Observed | Usable? |
+|---|---|---|
+| `rearDerailleurIndex` / `Max` | `10/11`, tracks every shift | Yes |
+| `rearDerailleurSize` | constant `12` in every gear | **No** |
+| `frontDerailleurIndex` / `Max` | `255/255` (no-data sentinel) | No — 1x bike |
+| `frontDerailleurSize` | `0` | **No** |
+
+So **positions are live; teeth are not**. Tooth counts come from app settings
+via `GearConfig.mc`. This is also why Garmin's own Gear Ratio field is blank on
+this bike: front teeth are 0, so the ratio is undefined.
+
+**Index convention (confirmed on-device):** rear position 1 is the **easiest**
+gear — the largest cog — descending to the smallest at position 11. This is the
+*opposite* of GarminGearRatio's assumption; do not copy that project's
+`sortAscending` for the rear.
+
+### Removed / ruled out
+
+**Shimano BLE stream** (`0x18EF`/`2AC1`) — removed 2026-08-09. It connected but
+cycled connect→drop, delivering only tags `0x01`/`0x06` plus a battery read;
+the gear (`0x00`) and mode (`0x02`) packets never arrived. It may also have been
+competing with the Edge's own STEPS pairing, which is the thing that feeds
+`Activity.Info`. `docs/SCEM800-BLE-protocol.md` and the deleted
+`ShimanoBleDelegate.mc` (see git history) remain accurate if it is ever revived.
+
+**`AntPlus.Shifting`** — the 9.2.0 SDK doc for `getShiftingStatus()` states
+verbatim that it "Will not provide status for Shimano shifting systems."
+
+**eBike telemetry** (assist mode, ebike battery, travel range, shifting advice)
+— **not exposed to Connect IQ at all.** Zero hits across the entire SDK doc
+tree; `Activity.Info` has no assist/battery/range member and AntPlus has no
+eBike class. Those are firmware-internal native fields. BLE is the only possible
+source, which is what the removal above costs.
 
 ## App type & structure
 
-Single `type="datafield"` app, `edge1050`, permission `BluetoothLowEnergy`. One
-BLE connection owned by the field; "pages" are **display modes** chosen via the
-`DisplayMode` setting (0=Ride, 1=Gear Config, 2=Test), not button navigation.
+Single `type="datafield"` app, `edge1050`, **no permissions**. "Pages" are
+**display modes** chosen via the `DisplayMode` setting (0=Ride, 1=Gear Config,
+2=Test), not button navigation.
 
-- `source/Di2StepsApp.mc` — AppBase; wires up the view + BLE.
+- `source/Di2StepsApp.mc` — AppBase; builds the view.
 - `source/Di2StepsView.mc` — DataField; `onUpdate` dispatches on `DisplayMode`.
-- `source/ShimanoBleDelegate.mc` — BLE central: scan/pair/identify-by-MAC/notify.
-- `source/StepsData.mc` — decoded state + raw-packet capture for the Test screen.
+- `source/StepsData.mc` — drivetrain state sampled from `Activity.Info`.
+- `source/GearConfig.mc` — tooth counts from settings + ratio computation.
 
 ## Known issues & validation notes
 
-**BLE profile registration:** Garmin CIQ has a documented bug on VivoActive 4 /
-Venu where registering the 2nd and 3rd BLE profiles fails silently. Edge 1050
-should not be affected. If connection fails on device, the signal is the Test
-screen's status line reading **"Initializing..."** and never advancing to
-"Scanning..." — `statusLine()` shows that whenever
-`ShimanoBleDelegate.isRegistered()` is false, i.e. fewer than 3 profiles
-registered. (ebikeDataField surfaces the same condition as an "ErrPrf_N" string;
-we do not have an equivalent `errorReport` field, and the status line is
-sufficient.)
+**Sample at draw time.** `onUpdate` calls `Activity.getActivityInfo()` itself
+rather than relying only on the value cached by `compute()`. `compute()` runs at
+1 Hz and `onUpdate` can run before it within a cycle, which rendered the
+previous second's gear — that was a measured ~1s lag behind Garmin's built-in
+field. Don't "simplify" this back to a cache read without re-measuring.
 
-**Unwired settings:** `Debug`, `FrontRings`, `FrontTeeth`, `RearTeeth` are
-declared in `resources/properties.xml` and appear in the settings UI, but no
-source file reads them yet. See the comments there.
+**Unimplemented modes:** `drawRide` and `drawGearConfig` are stubs.
 
 ## Versioning
 
@@ -89,7 +95,10 @@ is actually running.
 ## Build & run
 
 SDK: `~/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-9.2.0-2026-06-09-92a1605b2`
-Dev key: `/Users/robert/Certs/garmin_developer_key.der`
+Dev key: `~/Library/Mobile Documents/com~apple~CloudDocs/Certs/garmin_developer_key.der`
+(in iCloud Drive so it survives a machine rebuild — the old `~/Certs` copy was
+lost that way. If a build fails on a missing key that `ls` shows as present,
+iCloud has evicted its contents; open the folder in Finder to re-download.)
 Deployment tool: **SwiftMTP** (`github.com/Neighbor-Z/SwiftMTP`) — CLI for MTP file transfer to Garmin devices
 
 Verify the SDK is actually where the build expects before debugging a build failure:
@@ -101,7 +110,8 @@ ls "$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/"
 ### Simulator workflow
 ```bash
 SDK="$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-9.2.0-2026-06-09-92a1605b2"
-"$SDK/bin/monkeyc" -d edge1050 -f monkey.jungle -o bin/di2steps.prg -y /Users/robert/Certs/garmin_developer_key.der
+KEY="$HOME/Library/Mobile Documents/com~apple~CloudDocs/Certs/garmin_developer_key.der"
+"$SDK/bin/monkeyc" -d edge1050 -f monkey.jungle -o bin/di2steps.prg -y "$KEY"
 open "$SDK/bin/ConnectIQ.app"           # launch simulator
 "$SDK/bin/monkeydo" bin/di2steps.prg edge1050
 ```
@@ -116,27 +126,41 @@ the push to load the data field.
 
 ## Testing
 
-**Neither data path can be exercised in the simulator.** BLE stays on
-"Scanning..." forever, and `Activity.Info`'s derailleur fields have no simulated
-drivetrain behind them. The simulator verifies exactly three things: it
-compiles, it passes strict type-checking, and the Test screen lays out at the
-field's slot size. Everything about data retrieval is device-only, on the real
-Edge 1050 + bike.
+**The data path cannot be exercised in the simulator.** `Activity.Info`'s
+derailleur fields have no simulated drivetrain behind them, so they read as
+never-sampled. The simulator verifies exactly two things: it compiles, and the
+Test screen lays out at the field's slot size. Everything about data retrieval
+is device-only, on the real Edge 1050 + bike.
 
-On-device procedure — set `DisplayMode = 2` (Test / Diagnostics) and read the
-two blocks:
+Note `compute()` only runs while an activity is recording, so every value reads
+`--` until you actually start one. That is expected, not a fault.
 
-- **Values block** (large, auto-fit): build tag + slot size, connection status,
-  then one row per decoded field. Rows sourced from `Activity.Info` are
-  prefixed `A:` to distinguish them from the BLE-decoded rows. `--` means not
-  yet received; `null` means the field was read and the head unit returned
-  nothing — that distinction is the whole point of the current probe.
-- **Raw block** (small, bottom, capped at 40% height): last raw packet seen per
-  BLE type-tag as hex. Empty tags are omitted, so a missing row means that
-  packet type has never arrived.
+On-device procedure — set `DisplayMode = 2` (Test / Diagnostics), which renders:
 
-Shift through the full rear range and cycle every assist mode; a bench test is
-not sufficient, since several fields only populate while the motor is active.
+```
+B6 480x800
+Front: Position = 1 Teeth = 38
+Rear: Position = 10 Teeth = 14
+Ratio = 2.71
+```
+
+Reading the position values, which is where the diagnostic value is:
+
+| Shown | Meaning |
+|---|---|
+| `n/a` | The API doesn't expose derailleur fields on this device |
+| `--` | Never sampled — no activity running |
+| `null` | Sampled, and the head unit had nothing to report |
+| a number | Live value |
+
+Teeth show `--` when unconfigured, and `Ratio` shows `--` unless both ends
+resolve — never a fabricated `0.00`.
+
+Set **Front Teeth** and **Rear Teeth** in settings before riding, or the ratio
+row cannot compute. Shift through the full rear range and check the ratio moves
+sensibly; also compare against Garmin's built-in "Rear cog position" field,
+which is the reference for whether our position tracking is correct and
+timely.
 
 ### Type checking
 

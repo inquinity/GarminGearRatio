@@ -6,12 +6,15 @@
 # - Garmin ConnectIQ SDK installed
 # - SwiftMTP CLI (https://github.com/Neighbor-Z/SwiftMTP)
 # - Garmin Edge 1050 connected via USB in MTP mode
-# - Dev key at /Users/robert/Certs/garmin_developer_key.der
+# - Dev key in iCloud Drive (see DEV_KEY below)
 
 set -e
 
 SDK_PATH="$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-9.2.0-2026-06-09-92a1605b2"
-DEV_KEY="/Users/robert/Certs/garmin_developer_key.der"
+# Kept in iCloud Drive deliberately: it survives a machine rebuild, which local
+# ~/Certs did not. Note iCloud can evict file contents — if the build fails on a
+# key that `ls` shows as present, open the folder in Finder to force a download.
+DEV_KEY="$HOME/Library/Mobile Documents/com~apple~CloudDocs/Certs/garmin_developer_key.der"
 PRG_OUTPUT="bin/di2steps.prg"
 MONKEY_JUNGLE="monkey.jungle"
 MANIFEST="manifest.xml"
