@@ -89,8 +89,12 @@ UUID (`ac6eef9d9ca5471caafb0730d68bee87`).
 `deploy.sh` will report success, the file will land in `/GARMIN/Apps`, and the
 Edge will silently keep running the old code — which looks exactly like a code
 change that didn't work. `deploy.sh` echoes the version it is building for this
-reason; the Test screen's build tag is the on-device confirmation of which build
-is actually running.
+reason, and verifies the pushed file's byte size afterwards.
+
+The Test screen used to carry a build tag (`B5`, `B6`) as on-device
+confirmation of which build was running. It was dropped once deploys were
+reliable. If you ever again suspect the Edge is running stale code, adding a
+tag line back to `drawTest` is the quickest way to prove it.
 
 ## Build & run
 
@@ -166,9 +170,10 @@ Note `compute()` only runs while an activity is recording, so every value reads
 On-device procedure — set `DisplayMode = 2` (Test / Diagnostics), which renders:
 
 ```
-B6 480x800
-Front: Position = 1 Teeth = 38
-Rear: Position = 10 Teeth = 14
+Front Position = 1
+Front Teeth = 38
+Rear Position = 10
+Rear Teeth = 14
 Ratio = 2.71
 ```
 

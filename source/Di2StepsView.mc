@@ -18,11 +18,6 @@ class Di2StepsView extends WatchUi.DataField {
     private var _data as StepsData;
     private var _config as GearConfig;
 
-    // Shown on the Test screen so you can tell at a glance which build the Edge
-    // is actually running. Bump this alongside the manifest version on every
-    // push — a stale tag is worse than no tag.
-    private const BUILD_TAG = "B6";
-
     // Font ladders, smallest → largest. A data field's dc is sized to its slot
     // (full-screen single field, half-width, or one row of a multi-field page),
     // so we pick the largest font whose content still fits rather than hardcode.
@@ -106,9 +101,10 @@ class Di2StepsView extends WatchUi.DataField {
         var rearPos  = _data.rearPosition();
 
         var lines = [];
-        lines.add(BUILD_TAG + " " + dc.getWidth() + "x" + dc.getHeight());
-        lines.add("Front: Position = " + posOr(frontPos) + " Teeth = " + numOr(_config.frontTeethAt(frontPos)));
-        lines.add("Rear: Position = " + posOr(rearPos) + " Teeth = " + numOr(_config.rearTeethAt(rearPos)));
+        lines.add("Front Position = " + posOr(frontPos));
+        lines.add("Front Teeth = " + numOr(_config.frontTeethAt(frontPos)));
+        lines.add("Rear Position = " + posOr(rearPos));
+        lines.add("Rear Teeth = " + numOr(_config.rearTeethAt(rearPos)));
         lines.add("Ratio = " + ratioText(frontPos, rearPos));
         drawBlock(dc, lines, 4, 4, dc.getWidth() - 8, dc.getHeight() - 8);
     }
