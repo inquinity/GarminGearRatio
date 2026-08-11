@@ -119,6 +119,35 @@ function testInferChainringsRejectsZero(logger as Test.Logger) as Boolean {
     return $.inferChainrings(0) == null;
 }
 
+// ── property access must not throw ───────────────────────────────────────────
+//
+// Properties.getValue() throws on a key that isn't declared in
+// resources/properties.xml. In v1.0.8 the LastFrontMax constant existed and was
+// read, but the declaration was missing, so the settings wizard crashed to the
+// "IQ!" screen the instant it asked for the chainring count. Nothing caught it
+// because no test touched Properties at all.
+//
+// These call every Properties-reading entry point. They assert little about the
+// values — the point is that the call completes rather than throwing.
+
+(:test)
+function testDetectedRearCogsDoesNotThrow(logger as Test.Logger) as Boolean {
+    var cogs = $.detectedRearCogs();
+    return cogs == null || cogs >= 2;
+}
+
+(:test)
+function testChainringCountDoesNotThrow(logger as Test.Logger) as Boolean {
+    return $.chainringCount() >= 1;
+}
+
+(:test)
+function testGearConfigLoadDoesNotThrow(logger as Test.Logger) as Boolean {
+    var c = new GearConfig();   // initialize() calls load(), which reads 3 keys
+    c.load();
+    return c.frontRings >= 1;
+}
+
 // ── isPlausibleTeeth boundaries ──────────────────────────────────────────────
 
 (:test)

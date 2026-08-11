@@ -27,10 +27,15 @@
     <property id="FrontTeeth" type="String"></property>
     <property id="RearTeeth"  type="String"></property>
 
-    <!-- Written by the data field whenever Activity.Info reports
-         rearDerailleurMax; read by the on-device wizard so it can pre-mark the
-         detected cassette size. The wizard normally runs with no activity
+    <!-- Drivetrain sizes last seen by the data field, cached so the on-device
+         wizard knows the bike without asking: it normally runs with no activity
          recording, when Activity.Info has nothing live to offer. Not shown in
-         the settings UI — it is a cache, not a preference.                    -->
-    <property id="LastRearMax" type="Number">0</property>
+         the settings UI — these are caches, not preferences.
+
+         BOTH must stay declared. Properties.getValue() throws on an undeclared
+         key, and omitting LastFrontMax crashed the settings wizard the moment
+         it read the chainring count (v1.0.8). See GearConfigTest's
+         property-access tests, which exist to catch exactly that.            -->
+    <property id="LastRearMax"  type="Number">0</property>
+    <property id="LastFrontMax" type="Number">0</property>
 </properties>
