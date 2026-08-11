@@ -101,7 +101,7 @@ class Di2StepsView extends WatchUi.DataField {
         var rearPos  = _data.rearPosition();
 
         var lines = [];
-        lines.add("Front Position = " + frontPosOr(frontPos));
+        lines.add("Front Position = " + posOr(frontPos));
         lines.add("Front Teeth = " + numOr(_config.frontTeethAt(frontPos)));
         lines.add("Rear Position = " + posOr(rearPos));
         lines.add("Rear Teeth = " + numOr(_config.rearTeethAt(rearPos)));
@@ -111,27 +111,16 @@ class Di2StepsView extends WatchUi.DataField {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    // Gear positions come from Activity.Info, so they need three renderings.
-    // "--" (never sampled) must stay distinct from "null" (sampled, head unit
-    // had nothing) — conflating them hid a whole ride's worth of diagnosis.
+    // "--" covers both "not sampled yet" and "sampled, head unit had nothing".
+    // These were rendered separately ("--" vs "null") during the 2026-08-09
+    // probe, when telling them apart was the entire point; that question is
+    // settled, so the screen now reads consistently instead. Restoring the
+    // distinction is a two-line change if a future symptom needs it.
+    //
+    // "n/a" is deliberately NOT folded in — it means the API doesn't expose
+    // derailleur fields on this device at all, which is a different problem
+    // from having no data right now.
     private function posOr(n as Number?) as String {
-        if (!_data.supported) {
-            return "n/a";
-        } else if (!_data.read) {
-            return "--";
-        } else if (n == null) {
-            return "null";
-        }
-        return n.toString();
-    }
-
-    // Front position has no live source on a 1x bike: Activity.Info reports the
-    // 255 no-data sentinel, so the value comes from configuration instead.
-    // "--" therefore means "not configured" rather than "not yet sampled", and
-    // there is no head-unit reading being hidden behind it. Kept separate from
-    // posOr so the rear, which DOES have a live source, can still distinguish
-    // "never sampled" from "sampled and empty".
-    private function frontPosOr(n as Number?) as String {
         if (!_data.supported) {
             return "n/a";
         }

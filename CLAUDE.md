@@ -182,9 +182,13 @@ Reading the position values, which is where the diagnostic value is:
 | Shown | Meaning |
 |---|---|
 | `n/a` | The API doesn't expose derailleur fields on this device |
-| `--` | Never sampled — no activity running |
-| `null` | Sampled, and the head unit had nothing to report |
+| `--` | No value: either not sampled yet, or the head unit reported nothing |
 | a number | Live value |
+
+During the 2026-08-09 probe those last two were rendered separately (`--` vs
+`null`) because telling them apart was the whole question. That is settled, so
+the screen now reads consistently. If a future symptom needs the distinction
+back, it is a two-line change in `posOr`.
 
 Teeth show `--` when unconfigured, and `Ratio` shows `--` unless both ends
 resolve — never a fabricated `0.00`.
