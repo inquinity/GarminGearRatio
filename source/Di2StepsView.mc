@@ -101,7 +101,7 @@ class Di2StepsView extends WatchUi.DataField {
         var rearPos  = _data.rearPosition();
 
         var lines = [];
-        lines.add("Front Position = " + posOr(frontPos));
+        lines.add("Front Position = " + frontPosOr(frontPos));
         lines.add("Front Teeth = " + numOr(_config.frontTeethAt(frontPos)));
         lines.add("Rear Position = " + posOr(rearPos));
         lines.add("Rear Teeth = " + numOr(_config.rearTeethAt(rearPos)));
@@ -123,6 +123,19 @@ class Di2StepsView extends WatchUi.DataField {
             return "null";
         }
         return n.toString();
+    }
+
+    // Front position has no live source on a 1x bike: Activity.Info reports the
+    // 255 no-data sentinel, so the value comes from configuration instead.
+    // "--" therefore means "not configured" rather than "not yet sampled", and
+    // there is no head-unit reading being hidden behind it. Kept separate from
+    // posOr so the rear, which DOES have a live source, can still distinguish
+    // "never sampled" from "sampled and empty".
+    private function frontPosOr(n as Number?) as String {
+        if (!_data.supported) {
+            return "n/a";
+        }
+        return (n == null) ? "--" : n.toString();
     }
 
     // Teeth come from settings, so there are only two cases: configured, or not.

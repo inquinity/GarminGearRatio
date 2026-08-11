@@ -164,6 +164,66 @@ function testRatioNullWhenPositionUnknown(logger as Test.Logger) as Boolean {
     return fixture().ratio(null, 10) == null;
 }
 
+// ── front position must never be invented from defaults ──────────────────────
+
+// Activity.Info reports 255/255 for the front on this 1x bike, so these cover
+// the config-derived fallback. FrontRings DEFAULTS to 1, so keying the fallback
+// off it alone would fabricate "Position = 1" for an unconfigured rider.
+
+function unconfiguredData() as StepsData {
+    var d = new StepsData();
+    d.supported = true;
+    d.read      = true;
+    d.frontIndex = 0xFF;   // no front derailleur present
+    d.frontMax   = 0xFF;
+    return d;
+}
+
+(:test)
+function testFrontPositionNullWhenNoTeethConfigured(logger as Test.Logger) as Boolean {
+    var c = new GearConfig();
+    c.frontRings = 1;                        // the property default
+    c.frontTeeth = [] as Array<Number>;      // but nothing entered
+    return unconfiguredData().frontPosition(c) == null;
+}
+
+(:test)
+function testFrontPositionOneWhenSingleRingConfigured(logger as Test.Logger) as Boolean {
+    var c = new GearConfig();
+    c.frontRings = 1;
+    c.frontTeeth = [38] as Array<Number>;
+    return unconfiguredData().frontPosition(c) == 1;
+}
+
+(:test)
+function testFrontPositionNullForUnresolvedDoubleRing(logger as Test.Logger) as Boolean {
+    // 2x with no live index: we cannot know which ring is engaged.
+    var c = new GearConfig();
+    c.frontRings = 2;
+    c.frontTeeth = [50, 34] as Array<Number>;
+    return unconfiguredData().frontPosition(c) == null;
+}
+
+(:test)
+function testFrontPositionPrefersLiveValue(logger as Test.Logger) as Boolean {
+    // If the head unit ever does report a front index, it wins over config.
+    var d = unconfiguredData();
+    d.frontIndex = 2;
+    var c = new GearConfig();
+    c.frontRings = 2;
+    c.frontTeeth = [50, 34] as Array<Number>;
+    return d.frontPosition(c) == 2;
+}
+
+(:test)
+function testRearPositionRejectsSentinel(logger as Test.Logger) as Boolean {
+    var d = new StepsData();
+    d.supported = true;
+    d.read      = true;
+    d.rearIndex = 0xFF;
+    return d.rearPosition() == null;
+}
+
 (:test)
 function testRatioRisesWithPosition(logger as Test.Logger) as Boolean {
     // Position 1 is easiest, so the ratio must increase monotonically.

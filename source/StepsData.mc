@@ -62,15 +62,23 @@ class StepsData {
         return valid(rearIndex);
     }
 
-    // Front position, with a fallback that matters on a 1x drivetrain: there is
-    // no front derailleur to report, so Activity.Info sends 255/255. If the
-    // rider has configured a single chainring, position 1 is the only
-    // possibility and is more useful than showing nothing.
+    // Front position. On a 1x drivetrain there is no front derailleur to
+    // report, so Activity.Info sends 255/255 and the only possible source is
+    // the rider's configuration.
+    //
+    // The fallback to position 1 requires the rider to have ACTUALLY ENTERED a
+    // single chainring — frontRings alone is not enough, because it defaults to
+    // 1 in properties.xml. Keying off the default would mean inventing
+    // "Position = 1" for someone who has configured nothing, which is a
+    // fabricated reading dressed up as data. Unconfigured must stay unknown.
     function frontPosition(config as GearConfig) as Number? {
         var live = valid(frontIndex);
         if (live != null) {
             return live;
         }
-        return (config.frontRings == 1) ? 1 : null;
+        if (config.frontRings == 1 && config.frontTeeth.size() == 1) {
+            return 1;
+        }
+        return null;
     }
 }
