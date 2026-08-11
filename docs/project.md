@@ -168,3 +168,52 @@ needs to capture at higher rate, or in more detail than nRF Connect provides).
   Noted: the Connect IQ BLE permission prompt appears on activity start, as
   expected from the `BluetoothLowEnergy` manifest permission. If `Activity.Info`
   proves sufficient for gear, dropping that permission removes the prompt.
+- 2026-08-09 (ride results): **Project scope settled — gear ratio only.**
+
+  On-device ride, build B5:
+
+  | Row | Result |
+  |---|---|
+  | `A:R 10/11` | Tracks every shift correctly, ~1s behind Garmin's own field |
+  | `A:R t12` | **Constant 12 in every gear** — not per-gear teeth |
+  | `A:F 255/255 t0` | No front derailleur; 1x bike, no data to report |
+  | `Gear --/--` (BLE) | Never populated |
+  | Raw `0x01`, `0x06` | Arrived; `0x00` gear and `0x02` mode never did |
+  | `Bat 82%` | BLE connected at least once |
+
+  Conclusions drawn:
+  - `rearDerailleurSize` is unusable — a constant, not live teeth. **Tooth
+    counts must be user-entered**, as originally designed.
+  - Garmin's Gear Ratio field is blank because `frontDerailleurSize` is 0, not
+    because teeth are unavailable generally.
+  - BLE was connect→drop cycling (battery survives `onDisconnect`, everything
+    else is cleared — exactly the screen observed), possibly competing with the
+    Edge's own STEPS pairing.
+  - The ~1s lag is a render-ordering artifact: `compute()` caches at 1 Hz and
+    `onUpdate` can run first.
+  - **Connect IQ exposes no eBike API at all** — no assist mode, ebike battery,
+    travel range, or shifting advice anywhere in the 9.2.0 SDK. Verified by
+    grepping the full doc tree. Those are firmware-internal native fields.
+
+  **Index convention confirmed by the rider:** rear position 1 is the easiest
+  gear (largest cog); normal riding is cogs 9-11, dropping to 4-5 at stoplights.
+  This is the opposite of GarminGearRatio's assumption — that project may be
+  inverted for this drivetrain and should be checked separately.
+
+  **Decision: BLE removed** (v1.0.2, build B6). `ShimanoBleDelegate.mc` deleted,
+  `BluetoothLowEnergy` permission dropped, `Debug`/`LastLock`/`LastMAC` settings
+  removed. The app now has **no permissions**. Accepted cost: assist mode,
+  assist level, cadence, and rider profile are unavailable and have no
+  alternative source. eBike telemetry is academic for this project.
+
+  **Scope from here:** show gear positions and the gear ratio (front teeth /
+  rear teeth) as a decimal to 2 places. New `GearConfig.mc` parses the tooth
+  CSVs (`parseTeethCsv` ported from GarminGearRatio) and sorts rear teeth
+  largest-first so entry order cannot invert the ratio. Test page rewritten to
+  Front/Rear position+teeth plus Ratio. Draw-time sampling added to fix the lag.
+
+  Also: the dev key moved to iCloud Drive after `~/Certs` was lost in a machine
+  rebuild; `deploy.sh` and `CLAUDE.md` updated.
+
+  **Not yet validated on-device:** ratio arithmetic, teeth-to-position mapping,
+  and whether the draw-time sampling actually removes the lag.
