@@ -140,10 +140,12 @@ class GearSettingsDelegate extends WatchUi.BehaviorDelegate {
         var cogs = $.detectedRearCogs();
         if (cogs == null) {
             // Never ridden with this field installed, so nothing to go on.
+            // Di2 was never built below 11-speed, so those are the only two
+            // worth offering — a detected value is still used as-is, whatever
+            // it turns out to be.
             var menu = new WatchUi.Menu2({:title => "Rear Cogs"});
-            for (var n = 9; n <= 13; n++) {
-                menu.addItem(new WatchUi.MenuItem(n.toString() + "-speed", "", n, {}));
-            }
+            menu.addItem(new WatchUi.MenuItem("11-speed", "", 11, {}));
+            menu.addItem(new WatchUi.MenuItem("12-speed", "", 12, {}));
             WatchUi.pushView(menu, new RearCogsMenuDelegate(), WatchUi.SLIDE_UP);
             return true;
         }
