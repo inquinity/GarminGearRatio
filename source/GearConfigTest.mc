@@ -68,6 +68,39 @@ function testSortAscendingPutsSmallRingFirst(logger as Test.Logger) as Boolean {
     return r[0] == 34 && r[1] == 50;
 }
 
+// ── wizard entry order vs stored position order ──────────────────────────────
+//
+// The pickers walk sprockets smallest-first; storage keeps position 1 as the
+// easiest gear (largest cog). Those are reverses of each other at the rear, so
+// re-running the wizard as a review must round-trip exactly — otherwise paging
+// through and accepting every value would silently reverse the cassette.
+
+(:test)
+function testReviewRoundTripPreservesRearOrder(logger as Test.Logger) as Boolean {
+    var stored     = $.sortDescending([51, 45, 39, 33, 28, 24, 21, 18, 16, 14, 12] as Array<Number>);
+    var entryOrder = $.sortAscending(stored);    // what the pickers prefill with
+    var committed  = $.sortDescending(entryOrder); // what commit() writes back
+
+    if (entryOrder[0] != 12 || entryOrder[10] != 51) {
+        return false;   // pickers must start at the smallest cog
+    }
+    for (var i = 0; i < stored.size(); i++) {
+        if (committed[i] != stored[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+(:test)
+function testReviewRoundTripPreservesFrontOrder(logger as Test.Logger) as Boolean {
+    // Front storage is already ascending, so entry order matches it.
+    var stored     = $.sortAscending([50, 34] as Array<Number>);
+    var entryOrder = $.sortAscending(stored);
+    var committed  = $.sortAscending(entryOrder);
+    return entryOrder[0] == 34 && committed[0] == stored[0] && committed[1] == stored[1];
+}
+
 // ── teethToCsv round-trips through parseTeethCsv ─────────────────────────────
 
 (:test)

@@ -85,9 +85,11 @@ class TeethEntry {
     var frontTeeth as Array<Number>;
     var rearTeeth  as Array<Number>;
 
-    // Populated when re-entering the same topology as the saved config, so each
-    // picker starts on the currently saved value. That lets the wizard double
-    // as a review pass: page through accepting everything and nothing changes.
+    // Saved teeth to prefill the pickers with, held in ENTRY order — smallest
+    // first — not position order. The wizard walks sprockets the way riders
+    // describe them ("11 up to 50"), while storage keeps position 1 as the
+    // easiest gear. These two orders are reverses of each other at the rear, so
+    // whoever fills these in must sort ascending; see startToothEntry.
     var existingFrontTeeth as Array<Number>;
     var existingRearTeeth  as Array<Number>;
 
@@ -111,8 +113,9 @@ class TeethEntry {
         return fallback;
     }
 
-    // Values may be picked in any order; sort into position order before saving
-    // so position 1 is always the easiest gear — small ring, large cog.
+    // Picks arrive smallest-first; sort into POSITION order before saving, so
+    // position 1 is always the easiest gear — small ring, large cog. The sort
+    // also means a mis-ordered entry still lands correctly.
     function commit() as Void {
         Properties.setValue("FrontRings", frontTotal);
         Properties.setValue("FrontTeeth", $.teethToCsv($.sortAscending(frontTeeth)));
@@ -241,8 +244,11 @@ function startToothEntry(frontTotal as Number, rearTotal as Number, transition a
 
     var current = new GearConfig();
     if (current.frontTeeth.size() == frontTotal && current.rearTeeth.size() == rearTotal) {
-        entry.existingFrontTeeth = current.frontTeeth;
-        entry.existingRearTeeth  = current.rearTeeth;
+        // Stored in position order (rear largest-first); the pickers walk
+        // smallest-first, so re-sort both into entry order. Without this the
+        // rear would prefill backwards and "review" would rewrite the cassette.
+        entry.existingFrontTeeth = $.sortAscending(current.frontTeeth);
+        entry.existingRearTeeth  = $.sortAscending(current.rearTeeth);
     }
 
     var start = entry.startValueFor(false, 0, null);
@@ -276,21 +282,23 @@ function showToothPicker(entry as TeethEntry, isRear as Boolean, position as Num
                          WatchUi.SLIDE_LEFT);
 }
 
-// Position 1 is the easiest gear, so label the ends rather than leaving the
-// rider to guess which way the cassette is being walked.
+// Sprockets are entered smallest-first, the way drivetrains are described
+// ("11-50 cassette"), so label the ends by SIZE rather than by gear difficulty.
+// Saying "easiest"/"hardest" here would be actively misleading now that entry
+// order is the reverse of position order at the rear.
 function toothPickerLabel(entry as TeethEntry, isRear as Boolean, position as Number) as String {
-    var pos1 = position + 1;
-    if (!isRear) {
-        if (entry.frontTotal == 1) {
-            return "Front Ring";
-        }
-        return "Ring " + pos1.toString() + " of " + entry.frontTotal.toString();
+    var step  = position + 1;
+    var total = isRear ? entry.rearTotal : entry.frontTotal;
+
+    if (!isRear && total == 1) {
+        return "Front Ring";
     }
+
     var suffix = "";
-    if (pos1 == 1) {
-        suffix = " (easiest)";
-    } else if (pos1 == entry.rearTotal) {
-        suffix = " (hardest)";
+    if (step == 1) {
+        suffix = " (smallest)";
+    } else if (step == total) {
+        suffix = " (largest)";
     }
-    return "Cog " + pos1.toString() + " of " + entry.rearTotal.toString() + suffix;
+    return (isRear ? "Cog " : "Ring ") + step.toString() + " of " + total.toString() + suffix;
 }
