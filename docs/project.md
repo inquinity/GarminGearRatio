@@ -197,8 +197,12 @@ needs to capture at higher rate, or in more detail than nRF Connect provides).
 
   **Index convention confirmed by the rider:** rear position 1 is the easiest
   gear (largest cog); normal riding is cogs 9-11, dropping to 4-5 at stoplights.
-  This is the opposite of GarminGearRatioVersion1's assumption — that project may be
-  inverted for this drivetrain and should be checked separately.
+  This was recorded here as "the opposite of v1's assumption", which was wrong.
+  v1's *code* sorts the rear largest-first exactly as we do, and its DESIGN.md
+  derives that rule from ki2's tests against real Di2 hardware. Only two doc
+  comments in its `GearConfig.mc` were swapped, describing each other's usage,
+  and that is what read as a disagreement. Those comments are fixed in v1 now.
+  **The two projects agree**, from independent evidence.
 
   **Decision: BLE removed** (v1.0.2, build B6). `ShimanoBleDelegate.mc` deleted,
   `BluetoothLowEnergy` permission dropped, `Debug`/`LastLock`/`LastMAC` settings

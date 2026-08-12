@@ -40,10 +40,11 @@ So **positions are live; teeth are not**. Tooth counts come from app settings
 via `GearConfig.mc`. This is also why Garmin's own Gear Ratio field is blank on
 this bike: front teeth are 0, so the ratio is undefined.
 
-**Index convention (confirmed on-device):** rear position 1 is the **easiest**
-gear — the largest cog — descending to the smallest at position 11. This is the
-*opposite* of GarminGearRatioVersion1's assumption; do not copy that project's
-`sortAscending` for the rear.
+**Index convention:** rear position 1 is the **easiest** gear — the largest cog
+— descending to the smallest at position 11; front position 1 is the small ring.
+Confirmed twice over: by the rider on this bike (2026-08-09) and, independently,
+by v1's `DESIGN.md`, which derives it from ki2's tests against real Di2
+hardware. See `docs/GearRatioV1-DESIGN.md` § "Entry order and sorting".
 
 ### Removed / ruled out
 
