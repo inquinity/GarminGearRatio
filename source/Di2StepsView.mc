@@ -22,6 +22,15 @@ class Di2StepsView extends WatchUi.DataField {
     // Last rear position actually drawn, so logShift fires on change only.
     private var _loggedRearPos as Number? = null;
 
+    // Ride screen tuning. The stacked-vs-side-by-side decision itself lives in
+    // GearConfig.ridePrefersSideBySide, where it is tested against every real
+    // slot size on the device.
+    //
+    // Smallest TEXT_FONTS index the ratio may shrink to before the tooth pair is
+    // dropped and the whole slot given to the number. Index 2 = FONT_SMALL. This
+    // is what protects 239x158 — the tightest slot and by far the most common.
+    private const RIDE_MIN_FONT = 2;
+
     // Font ladders, smallest → largest. A data field's dc is sized to its slot
     // (full-screen single field, half-width, or one row of a multi-field page),
     // so we pick the largest font whose content still fits rather than hardcode.
@@ -86,10 +95,99 @@ class Di2StepsView extends WatchUi.DataField {
 
     // ── Render modes ──────────────────────────────────────────────────────────
 
-    // Rider-facing screen: to be built once the Test screen confirms the
-    // numbers are right.
+    // Rider-facing screen: the gear ratio, as large as the slot allows, with the
+    // tooth pair alongside when there is room to spare.
+    //
+    // The ratio is never sacrificed. Teeth are the expendable element: they
+    // exist to confirm the position→teeth mapping is right, which is the one
+    // thing that can only be checked on a ride. If showing them would shrink
+    // the ratio below RIDE_MIN_FONT, they are dropped and the whole slot goes
+    // to the number.
     private function drawRide(dc as Graphics.Dc) as Void {
-        drawCentered(dc, "Di2 STEPS\nRide");
+        var frontPos = _data.frontPosition(_config);
+        var rearPos  = _data.rearPosition();
+
+        var ratio = ratioText(frontPos, rearPos);
+        var teeth = teethPairText(frontPos, rearPos);
+
+        var margin = 4;
+        var x = margin;
+        var y = margin;
+        var w = dc.getWidth()  - 2 * margin;
+        var h = dc.getHeight() - 2 * margin;
+
+        if (teeth == null) {
+            drawFitted(dc, ratio, x, y, w, h, Graphics.TEXT_JUSTIFY_CENTER);
+            return;
+        }
+
+        // Split the box and fit each part on its own, rather than laying out one
+        // combined string — a single string forces both values to share a font,
+        // and the ratio would shrink to accommodate the annotation. Separation
+        // is whitespace, not a punctuation glyph.
+        //
+        // Wide strips split vertically (side by side); everything else splits
+        // horizontally (stacked), where a line break is the natural separator.
+        if ($.ridePrefersSideBySide(w, h)) {
+            var gutter    = w / 16;
+            var ratioW    = (w - gutter) * 62 / 100;
+            var teethW    = w - gutter - ratioW;
+            var ratioFont = fitFont(dc, [ratio], ratioW, h);
+            if (fontIndex(ratioFont) < RIDE_MIN_FONT) {
+                drawFitted(dc, ratio, x, y, w, h, Graphics.TEXT_JUSTIFY_CENTER);
+                return;
+            }
+            // Shared baseline so the two values don't look ragged.
+            var teethFont = fitFont(dc, [teeth], teethW, h / 2);
+            var lh        = dc.getFontHeight(ratioFont);
+            var baseY     = y + (h - lh) / 2;
+            dc.drawText(x + ratioW, baseY, ratioFont, ratio, Graphics.TEXT_JUSTIFY_RIGHT);
+            dc.drawText(x + ratioW + gutter,
+                        baseY + lh - dc.getFontHeight(teethFont),
+                        teethFont, teeth, Graphics.TEXT_JUSTIFY_LEFT);
+            return;
+        }
+
+        // Stacked: give the teeth a fixed slice off the bottom, ratio takes the
+        // rest. If that leaves the ratio too small, drop the teeth entirely.
+        var teethH    = h / 4;
+        var ratioH    = h - teethH;
+        var stackFont = fitFont(dc, [ratio], w, ratioH);
+        if (fontIndex(stackFont) < RIDE_MIN_FONT) {
+            drawFitted(dc, ratio, x, y, w, h, Graphics.TEXT_JUSTIFY_CENTER);
+            return;
+        }
+        drawFitted(dc, ratio, x, y, w, ratioH, Graphics.TEXT_JUSTIFY_CENTER);
+        drawFitted(dc, teeth, x, y + ratioH, w, teethH, Graphics.TEXT_JUSTIFY_CENTER);
+    }
+
+    // "47:17", or null when either end is unknown — in which case there is
+    // nothing meaningful to annotate the ratio with.
+    private function teethPairText(frontPos as Number?, rearPos as Number?) as String? {
+        var tf = _config.frontTeethAt(frontPos);
+        var tr = _config.rearTeethAt(rearPos);
+        if (tf == null || tr == null) {
+            return null;
+        }
+        return tf.toString() + ":" + tr.toString();
+    }
+
+    // Draw one string at the largest font fitting the box, vertically centred.
+    private function drawFitted(dc as Graphics.Dc, text as String, x as Number, y as Number,
+                                w as Number, h as Number, justify as Number) as Void {
+        var font = fitFont(dc, [text], w, h);
+        var tx = (justify == Graphics.TEXT_JUSTIFY_CENTER) ? x + w / 2 : x;
+        dc.drawText(tx, y + (h - dc.getFontHeight(font)) / 2, font, text, justify);
+    }
+
+    // Position of a font within TEXT_FONTS, for comparing against a floor.
+    private function fontIndex(font as Graphics.FontDefinition) as Number {
+        for (var i = 0; i < TEXT_FONTS.size(); i++) {
+            if (TEXT_FONTS[i] == font) {
+                return i;
+            }
+        }
+        return 0;
     }
 
     // Drivetrain topology + tooth counts.
