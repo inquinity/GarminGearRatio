@@ -128,11 +128,17 @@ class TeethEntry {
     }
 }
 
-// ── Step 0: status screen ────────────────────────────────────────────────────
-// OK goes straight to the tooth pickers, because the drivetrain is already
-// known: the cassette size comes from the head unit and the ring count from
-// settings. Only a bike the field has never seen ridden needs the cog-count
-// question, and that is the sole reason RearCogsMenuDelegate still exists.
+// ── Step 0: status screen → settings menu ────────────────────────────────────
+//
+// This view IS the on-device settings UI for the field. Per the SDK's
+// "Properties and App Settings" topic, a data field that implements
+// getSettingsView() gets that view from the activity menu — it REPLACES the
+// menu the system would otherwise generate from resources/settings.xml. So
+// anything the rider needs to reach on the bike has to be offered here;
+// settings.xml only drives Garmin Connect on the phone.
+//
+// That is why Display Mode appears below. It was briefly unreachable on the
+// device after this wizard was added.
 class GearSettingsDelegate extends WatchUi.BehaviorDelegate {
 
     function initialize() {
@@ -140,25 +146,101 @@ class GearSettingsDelegate extends WatchUi.BehaviorDelegate {
     }
 
     function onSelect() as Boolean {
-        var cogs = $.detectedRearCogs();
-        if (cogs == null) {
-            // Never ridden with this field installed, so nothing to go on.
-            // Di2 was never built below 11-speed, so those are the only two
-            // worth offering — a detected value is still used as-is, whatever
-            // it turns out to be.
-            var menu = new WatchUi.Menu2({:title => "Rear Cogs"});
-            menu.addItem(new WatchUi.MenuItem("11-speed", "", 11, {}));
-            menu.addItem(new WatchUi.MenuItem("12-speed", "", 12, {}));
-            WatchUi.pushView(menu, new RearCogsMenuDelegate(), WatchUi.SLIDE_UP);
-            return true;
-        }
-        $.startToothEntry($.chainringCount(), cogs, WatchUi.SLIDE_UP);
+        var menu = new WatchUi.Menu2({:title => "Gear Ratio"});
+        menu.addItem(new WatchUi.MenuItem("Tooth Counts", "Chainring and cassette", MENU_TEETH, {}));
+        menu.addItem(new WatchUi.MenuItem("Display Mode", $.displayModeName(), MENU_MODE, {}));
+        WatchUi.pushView(menu, new SettingsMenuDelegate(), WatchUi.SLIDE_UP);
         return true;
     }
 
     function onBack() as Boolean {
         WatchUi.popView(WatchUi.SLIDE_DOWN);
         return true;
+    }
+}
+
+const MENU_TEETH = 1;
+const MENU_MODE  = 2;
+
+// Human-readable name of the current DisplayMode, for the menu subtitle and the
+// status screen. Mirrors the enum in Di2StepsView.
+function displayModeName() as String {
+    var m = Properties.getValue("DisplayMode");
+    if (m instanceof Lang.Number && m == 2) {
+        return "Test";
+    } else if (m instanceof Lang.Number && m == 1) {
+        return "Gear Config";
+    }
+    return "Ride";
+}
+
+// ── Settings menu ────────────────────────────────────────────────────────────
+class SettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
+
+    function initialize() {
+        Menu2InputDelegate.initialize();
+    }
+
+    function onSelect(item as WatchUi.MenuItem) as Void {
+        var id = item.getId();
+        if (!(id instanceof Lang.Number)) {
+            return;
+        }
+
+        if (id == $.MENU_MODE) {
+            // Gear Config (mode 1) is deliberately not offered: drawGearConfig
+            // is still a stub, and a menu entry that renders a placeholder is
+            // worse than no entry.
+            var menu = new WatchUi.Menu2({:title => "Display Mode"});
+            menu.addItem(new WatchUi.MenuItem("Ride", "Gear ratio", 0, {}));
+            menu.addItem(new WatchUi.MenuItem("Test", "Diagnostics", 2, {}));
+            WatchUi.pushView(menu, new DisplayModeMenuDelegate(), WatchUi.SLIDE_LEFT);
+            return;
+        }
+
+        // Tooth counts. The drivetrain is normally already known — cassette size
+        // from the head unit, ring count inferred — so this goes straight to the
+        // pickers. Only a bike the field has never seen ridden needs asking.
+        var cogs = $.detectedRearCogs();
+        if (cogs == null) {
+            // Di2 was never built below 11-speed, so those are the only two
+            // worth offering. A detected value is used as-is, whatever it is.
+            var cogMenu = new WatchUi.Menu2({:title => "Rear Cogs"});
+            cogMenu.addItem(new WatchUi.MenuItem("11-speed", "", 11, {}));
+            cogMenu.addItem(new WatchUi.MenuItem("12-speed", "", 12, {}));
+            WatchUi.pushView(cogMenu, new RearCogsMenuDelegate(), WatchUi.SLIDE_LEFT);
+            return;
+        }
+        $.startToothEntry($.chainringCount(), cogs, WatchUi.SLIDE_LEFT);
+    }
+
+    function onBack() as Void {
+        WatchUi.popView(WatchUi.SLIDE_DOWN);
+    }
+}
+
+// ── Display mode selection ───────────────────────────────────────────────────
+class DisplayModeMenuDelegate extends WatchUi.Menu2InputDelegate {
+
+    function initialize() {
+        Menu2InputDelegate.initialize();
+    }
+
+    function onSelect(item as WatchUi.MenuItem) as Void {
+        var id = item.getId();
+        if (!(id instanceof Lang.Number)) {
+            return;
+        }
+        Properties.setValue("DisplayMode", id as Number);
+
+        // Written directly, so onSettingsChanged() won't fire on its own — the
+        // running field would keep rendering the old mode until restart.
+        (Application.getApp() as Di2StepsApp).onSettingsChanged();
+        WatchUi.popView(WatchUi.SLIDE_DOWN);
+    }
+
+    function onBack() as Void {
+        WatchUi.popView(WatchUi.SLIDE_DOWN);
     }
 }
 

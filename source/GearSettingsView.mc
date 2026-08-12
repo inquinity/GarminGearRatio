@@ -27,12 +27,14 @@ class GearSettingsView extends WatchUi.View {
 
         var frontLine = "Front: " + summarise(config.frontTeeth);
         var rearLine  = "Rear: "  + summarise(config.rearTeeth);
+        var modeLine  = "Mode: "  + $.displayModeName();
         var hint      = configured ? "Press OK to change" : "Press OK to set up";
 
-        dc.drawText(w / 2, h / 8,     Graphics.FONT_TINY,  "Di2 STEPS Gears", Graphics.TEXT_JUSTIFY_CENTER);
-        dc.drawText(w / 2, h * 3 / 8, Graphics.FONT_SMALL, frontLine,         Graphics.TEXT_JUSTIFY_CENTER);
-        dc.drawText(w / 2, h * 5 / 8, Graphics.FONT_SMALL, rearLine,          Graphics.TEXT_JUSTIFY_CENTER);
-        dc.drawText(w / 2, h * 7 / 8, Graphics.FONT_TINY,  hint,              Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(w / 2, h * 1 / 10, Graphics.FONT_TINY,  "Gear Ratio", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(w / 2, h * 3 / 10, Graphics.FONT_SMALL, frontLine,    Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(w / 2, h * 5 / 10, Graphics.FONT_SMALL, rearLine,     Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(w / 2, h * 7 / 10, Graphics.FONT_SMALL, modeLine,     Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(w / 2, h * 9 / 10, Graphics.FONT_TINY,  hint,         Graphics.TEXT_JUSTIFY_CENTER);
     }
 
     // Teeth as "38T" / "11..50 (11)" / "not set". Summarised by range and count

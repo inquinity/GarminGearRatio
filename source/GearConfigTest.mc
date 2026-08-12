@@ -223,6 +223,12 @@ function testChainringCountDoesNotThrow(logger as Test.Logger) as Boolean {
 }
 
 (:test)
+function testDisplayModeNameDoesNotThrow(logger as Test.Logger) as Boolean {
+    var name = $.displayModeName();
+    return name.equals("Ride") || name.equals("Test") || name.equals("Gear Config");
+}
+
+(:test)
 function testGearConfigLoadDoesNotThrow(logger as Test.Logger) as Boolean {
     var c = new GearConfig();   // initialize() calls load(), which reads 3 keys
     c.load();
