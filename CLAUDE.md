@@ -74,10 +74,19 @@ Single `type="datafield"` app, `edge1050`, **no permissions**. "Pages" are
 **Sample at draw time.** `onUpdate` calls `Activity.getActivityInfo()` itself
 rather than relying only on the value cached by `compute()`. `compute()` runs at
 1 Hz and `onUpdate` can run before it within a cycle, which rendered the
-previous second's gear — that was a measured ~1s lag behind Garmin's built-in
-field. Don't "simplify" this back to a cache read without re-measuring.
+previous second's gear — a measured ~1s lag behind Garmin's built-in field,
+confirmed fixed on the road 2026-08-10. Don't "simplify" this back to a cache
+read without re-measuring.
 
-**Unimplemented modes:** `drawRide` and `drawGearConfig` are stubs.
+**Residual 0–1s jitter is the refresh interval, not a bug.** Shifts sometimes
+appear instantly and sometimes take up to ~1s. Connect IQ redraws a data field
+roughly once per second, so a shift landing just after a redraw waits for the
+next one, giving a delay uniform over 0–1s. There is no API to redraw faster,
+and no amount of sampling changes it. Don't chase it.
+
+**Unimplemented modes:** `drawRide` and `drawGearConfig` are stubs. The data
+path is validated and correct as of 2026-08-10, so all remaining work is UI:
+the Test screen is a diagnostic layout, not a rider-facing one.
 
 ## Versioning
 
@@ -171,11 +180,14 @@ On-device procedure — set `DisplayMode = 2` (Test / Diagnostics), which render
 
 ```
 Front Position = 1
-Front Teeth = 38
-Rear Position = 10
-Rear Teeth = 14
-Ratio = 2.71
+Front Teeth = 47
+Rear Position = 8
+Rear Teeth = 17
+Ratio = 2.76
 ```
+
+(Real values from the 2026-08-10 road test, cross-checked against Garmin's
+built-in "Rear cog position" field reading `8/11` on the same screen.)
 
 Reading the position values, which is where the diagnostic value is:
 

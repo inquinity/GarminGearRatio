@@ -217,3 +217,35 @@ needs to capture at higher rate, or in more detail than nRF Connect provides).
 
   **Not yet validated on-device:** ratio arithmetic, teeth-to-position mapping,
   and whether the draw-time sampling actually removes the lag.
+- 2026-08-10: **Road test passed. Core goal achieved.** v1.0.11 on the bike:
+
+  ```
+  Front Position = 1      Rear Position = 8
+  Front Teeth = 47        Rear Teeth = 17
+  Ratio = 2.76
+  ```
+
+  Validated against Garmin's built-in "Rear cog position" field on the same
+  screen, which read `8/11` at the same moment — our position matches exactly.
+  47/17 = 2.7647 → 2.76, so the arithmetic and the 2-decimal rounding are
+  right. Everything that could only be proven on the bike now has been:
+
+  | Previously unvalidated | Result |
+  |---|---|
+  | Position tracking vs Garmin's field | Matches exactly |
+  | Teeth-to-position mapping | Correct (position 8 → 17T) |
+  | Ratio arithmetic end-to-end | Correct |
+  | Draw-time sampling fixes the 1s lag | **Yes — systematic lag gone** |
+  | On-device wizard | Works; teeth entered successfully |
+  | Index convention (position 1 = easiest) | Confirmed in use |
+
+  **Residual timing jitter, by design, not a defect.** Updates are sometimes
+  instant and sometimes delayed by up to ~1s. Connect IQ redraws a data field
+  about once per second, and `onUpdate` is the only place we can sample; a shift
+  landing just after a redraw waits for the next one. The delay is therefore
+  uniform over 0–1s. Draw-time sampling removed the *systematic* full-second lag
+  (rendering the previous second's cached value); this remainder is the refresh
+  interval itself and there is no API to redraw faster. Do not chase it.
+
+  Remaining work is UI only — `drawRide` and `drawGearConfig` are still stubs,
+  and the Test screen is a diagnostic layout rather than a rider-facing one.
