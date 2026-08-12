@@ -102,6 +102,11 @@ previous second's gear — a measured ~1s lag behind Garmin's built-in field,
 confirmed fixed on the road 2026-08-10. Don't "simplify" this back to a cache
 read without re-measuring.
 
+**Update 2026-08-12:** measured again after the draw-time sampling landed, the
+lag is now **0.0–0.5s** (rider estimate), down from 0.0–1.0s. Still not settled,
+and the ratio-vs-position question below is still open. Shift logging is in
+place to answer it — see § Shift timing logs.
+
 **Residual 0–1s jitter — cause not yet settled.** Shifts sometimes appear
 instantly and sometimes take up to ~1s. The likely explanation is the refresh
 interval: Connect IQ redraws a data field roughly once per second, so a shift

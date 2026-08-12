@@ -247,6 +247,8 @@ needs to capture at higher rate, or in more detail than nRF Connect provides).
   sometimes delayed by up to ~1s. The refresh interval explains part of it:
   Connect IQ redraws a data field about once per second, so a shift landing just
   after a redraw waits for the next, giving a delay uniform over 0–1s.
+  Re-measured 2026-08-12 with draw-time sampling in place: now **0.0–0.5s**
+  (rider estimate). Improved but not eliminated, and still to be investigated.
 
   That was recorded here as settled, which was premature. The rider's follow-up
   was that **gear position updated contemporaneously while the ratio did not** —
