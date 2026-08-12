@@ -7,7 +7,7 @@ import Toybox.WatchUi;
 //
 // Gear positions come from Toybox.Activity.Info, which the head unit populates
 // from its own STEPS pairing; tooth counts come from app settings. The app
-// needs no permissions at all. Sibling to GearRatio (../GarminGearRatio), which
+// needs no permissions at all. Sibling to GearRatio (../GarminGearRatioVersion1), which
 // solves the same problem from a raw ANT+ Di2 channel.
 class Di2StepsApp extends Application.AppBase {
 

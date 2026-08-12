@@ -5,7 +5,7 @@ import Toybox.WatchUi;
 // Shown when the rider opens this data field's settings on the device.
 // Reports what is currently configured; OK starts the wizard, Back exits.
 //
-// Ported from ../GarminGearRatio/source/GearSettingsView.mc. Adapted: that app
+// Ported from ../GarminGearRatioVersion1/source/GearSettingsView.mc. Adapted: that app
 // derives its topology from a "Di2 profile" property, which this app does not
 // have — front ring count is a setting and rear cog count is known live from
 // Activity.Info, so the wizard asks for both instead.

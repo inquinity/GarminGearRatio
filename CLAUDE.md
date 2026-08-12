@@ -1,9 +1,14 @@
-# di2steps — Connect IQ data field for Shimano STEPS (SC-EM800)
+# GarminGearRatio — Connect IQ gear-ratio data field (Edge 1050)
 
 Shows drivetrain gear positions and the resulting **gear ratio** (the "power
-multiplier") as a Garmin data field, for a Shimano STEPS (SC-EM800) bike.
-Sibling to **GearRatio** (`../GarminGearRatio`), which solves the same problem
-from a raw ANT+ Di2 channel.
+multiplier") as a Garmin data field. Developed against a Shimano STEPS
+(SC-EM800) bike, but the data source is drivetrain-agnostic: it reads whatever
+the head unit reports, so it is not Di2- or STEPS-specific.
+
+Supersedes **Gear Ratio v1** (`../GarminGearRatioVersion1`), which solved the
+same problem from a raw ANT+ Di2 channel and required the `Ant` permission.
+This project took over the `GarminGearRatio` name on 2026-08-10; the app UUIDs
+and display names differ, so both can be installed side by side.
 
 - **Status log / decisions:** `docs/project.md`
 - **Historical BLE wire format:** `docs/SCEM800-BLE-protocol.md` (no longer used
@@ -37,7 +42,7 @@ this bike: front teeth are 0, so the ratio is undefined.
 
 **Index convention (confirmed on-device):** rear position 1 is the **easiest**
 gear — the largest cog — descending to the smallest at position 11. This is the
-*opposite* of GarminGearRatio's assumption; do not copy that project's
+*opposite* of GarminGearRatioVersion1's assumption; do not copy that project's
 `sortAscending` for the rear.
 
 ### Removed / ruled out

@@ -197,7 +197,7 @@ needs to capture at higher rate, or in more detail than nRF Connect provides).
 
   **Index convention confirmed by the rider:** rear position 1 is the easiest
   gear (largest cog); normal riding is cogs 9-11, dropping to 4-5 at stoplights.
-  This is the opposite of GarminGearRatio's assumption — that project may be
+  This is the opposite of GarminGearRatioVersion1's assumption — that project may be
   inverted for this drivetrain and should be checked separately.
 
   **Decision: BLE removed** (v1.0.2, build B6). `ShimanoBleDelegate.mc` deleted,
@@ -208,7 +208,7 @@ needs to capture at higher rate, or in more detail than nRF Connect provides).
 
   **Scope from here:** show gear positions and the gear ratio (front teeth /
   rear teeth) as a decimal to 2 places. New `GearConfig.mc` parses the tooth
-  CSVs (`parseTeethCsv` ported from GarminGearRatio) and sorts rear teeth
+  CSVs (`parseTeethCsv` ported from GarminGearRatioVersion1) and sorts rear teeth
   largest-first so entry order cannot invert the ratio. Test page rewritten to
   Front/Rear position+teeth plus Ratio. Draw-time sampling added to fix the lag.
 

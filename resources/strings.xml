@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <strings>
-    <string id="AppName">Di2 STEPS</string>
+    <string id="AppName">Gear Ratio</string>
 
     <!-- Which screen the field renders (see DisplayMode enum in Di2StepsView).
          Defaults to TEST while we are still proving the numbers are right.    -->

@@ -9,12 +9,12 @@ import Toybox.Lang;
 // with position) and the front reports 0. Verified on-device 2026-08-09 — see
 // docs/project.md. Only the POSITION fields track shifts.
 //
-// parseTeethCsv is ported from ../GarminGearRatio/source/GearConfig.mc, which
+// parseTeethCsv is ported from ../GarminGearRatioVersion1/source/GearConfig.mc, which
 // solves the same problem for a raw ANT+ Di2 channel.
 //
 // INDEX CONVENTION — confirmed on this bike 2026-08-09: **rear position 1 is
 // the easiest gear, i.e. the LARGEST cog**, descending to the smallest at
-// position 11. Note this is the opposite of GarminGearRatio's assumption, which
+// position 11. Note this is the opposite of GarminGearRatioVersion1's assumption, which
 // takes position 1 as the smallest/hardest cog (see its DESIGN.md); do not
 // copy that project's sortAscending for the rear.
 //

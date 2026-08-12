@@ -5,7 +5,7 @@ import Toybox.Lang;
 import Toybox.WatchUi;
 
 // On-device tooth-count wizard, ported from
-// ../GarminGearRatio/source/GearSettingsDelegate.mc.
+// ../GarminGearRatioVersion1/source/GearSettingsDelegate.mc.
 //
 // Flow:  status view → front ring count → rear cog count → one picker per
 //        ring, then one per cog → commit.
