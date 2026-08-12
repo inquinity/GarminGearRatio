@@ -78,11 +78,49 @@ previous second's gear — a measured ~1s lag behind Garmin's built-in field,
 confirmed fixed on the road 2026-08-10. Don't "simplify" this back to a cache
 read without re-measuring.
 
-**Residual 0–1s jitter is the refresh interval, not a bug.** Shifts sometimes
-appear instantly and sometimes take up to ~1s. Connect IQ redraws a data field
-roughly once per second, so a shift landing just after a redraw waits for the
-next one, giving a delay uniform over 0–1s. There is no API to redraw faster,
-and no amount of sampling changes it. Don't chase it.
+**Residual 0–1s jitter — cause not yet settled.** Shifts sometimes appear
+instantly and sometimes take up to ~1s. The likely explanation is the refresh
+interval: Connect IQ redraws a data field roughly once per second, so a shift
+landing just after a redraw waits for the next one, giving a delay uniform over
+0–1s. There is no API to redraw faster.
+
+**But that explanation predicts all five rows lag together**, and the rider's
+2026-08-10 report was that gear position updated contemporaneously while the
+ratio did not. Structurally that cannot happen: `drawTest` samples `rearPos`
+once and derives position, teeth, and ratio from it in a single draw. So either
+the comparison was our field against Garmin's own continuously-updating gear
+graphic (which the refresh-interval story does explain), or something is
+happening that this code doesn't account for. Shift logging exists to settle it.
+
+### Shift timing logs
+
+`Di2StepsView.logShift` emits one `System.println` line per *rendered* gear
+change — a few per minute, not per frame:
+
+```
+di2steps t=812345 rear=8 teeth=17 ratio=2.76 render=180ms
+```
+
+`render` is the gap between sampling first seeing that position
+(`StepsData.rearChangedAtMs`) and the draw that put it on screen. It measures
+the only part of the delay this app controls; the head unit's own reporting
+delay is invisible to us. Position, teeth and ratio are logged together on
+purpose — they come from one sample in one draw and so cannot disagree, and a
+log line showing them disagreeing would disprove that.
+
+**Reading the logs.** In the simulator they appear directly in the `monkeydo`
+console. On device, Connect IQ writes `println` output for side-loaded apps
+under `/GARMIN/Apps/LOGS/` — **this exact path is unverified**; check the
+directory listing after a ride and pull whatever appears:
+
+```bash
+CLI=/Applications/SwiftMTP.app/Contents/MacOS/swiftmtp-cli
+"$CLI" ls   <deviceId> <storageId> /GARMIN/Apps/LOGS
+"$CLI" pull <deviceId> <storageId> /GARMIN/Apps/LOGS/<file> ./ciq-log.txt
+```
+
+`deviceId`/`storageId` come from `swiftmtp-cli devices` / `storages` — the same
+values `deploy.sh` discovers.
 
 **Unimplemented modes:** `drawRide` and `drawGearConfig` are stubs. The data
 path is validated and correct as of 2026-08-10, so all remaining work is UI:

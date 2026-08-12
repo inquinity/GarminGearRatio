@@ -1,6 +1,7 @@
 import Toybox.Activity;
 import Toybox.Application.Properties;
 import Toybox.Lang;
+import Toybox.System;
 
 // Drivetrain state read from Toybox.Activity.Info.
 //
@@ -24,6 +25,16 @@ class StepsData {
 
     public var supported as Boolean = false;
     public var read      as Boolean = false;
+
+    // ── Shift timing, for diagnosing render latency ───────────────────────────
+    //
+    // System.getTimer() (monotonic ms) at the moment sampling FIRST saw the
+    // current rear position. onUpdate compares this against draw time to get the
+    // gap between "we knew" and "the rider saw", which is the only part of the
+    // delay this app controls — the gap between the physical shift and the head
+    // unit reporting it is invisible to us and not measured here.
+    public var rearChangedAtMs as Number = 0;
+    private var _prevRearIndex as Number? = null;
 
     public var frontIndex as Number? = null;
     public var frontMax   as Number? = null;
@@ -51,6 +62,14 @@ class StepsData {
         rearIndex  = info.rearDerailleurIndex;
         rearMax    = info.rearDerailleurMax;
         rearSize   = info.rearDerailleurSize;
+
+        // Stamp the first sample that carries a new position. Both compute() and
+        // onUpdate() call this, so whichever runs first wins — which is exactly
+        // "the earliest moment we could have known".
+        if (rearIndex != _prevRearIndex) {
+            _prevRearIndex  = rearIndex;
+            rearChangedAtMs = System.getTimer();
+        }
 
         remember($.LAST_REAR_MAX, valid(rearMax));
         remember($.LAST_FRONT_MAX, $.inferChainrings(frontMax));

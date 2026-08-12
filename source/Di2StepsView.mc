@@ -2,6 +2,7 @@ import Toybox.Activity;
 import Toybox.Application.Properties;
 import Toybox.Graphics;
 import Toybox.Lang;
+import Toybox.System;
 import Toybox.WatchUi;
 
 // Display modes, selected by the DisplayMode app-setting property.
@@ -17,6 +18,9 @@ class Di2StepsView extends WatchUi.DataField {
     private var _mode as Number = MODE_TEST;
     private var _data as StepsData;
     private var _config as GearConfig;
+
+    // Last rear position actually drawn, so logShift fires on change only.
+    private var _loggedRearPos as Number? = null;
 
     // Font ladders, smallest → largest. A data field's dc is sized to its slot
     // (full-screen single field, half-width, or one row of a multi-field page),
@@ -105,8 +109,38 @@ class Di2StepsView extends WatchUi.DataField {
         lines.add("Front Teeth = " + numOr(_config.frontTeethAt(frontPos)));
         lines.add("Rear Position = " + posOr(rearPos));
         lines.add("Rear Teeth = " + numOr(_config.rearTeethAt(rearPos)));
-        lines.add("Ratio = " + ratioText(frontPos, rearPos));
+        var ratio = ratioText(frontPos, rearPos);
+        lines.add("Ratio = " + ratio);
+        logShift(rearPos, _config.rearTeethAt(rearPos), ratio);
         drawBlock(dc, lines, 4, 4, dc.getWidth() - 8, dc.getHeight() - 8);
+    }
+
+    // One line per rendered gear change, for investigating shift-to-screen
+    // latency after a ride. Fires only when the drawn position actually changes
+    // — a few times a minute, not every frame — so it costs nothing in normal
+    // riding.
+    //
+    // `render` is the gap between sampling first seeing this position and this
+    // draw putting it on screen. It is the only part of the delay this app
+    // controls; the head unit's own reporting delay is invisible to us.
+    //
+    // Position, teeth and ratio are logged together deliberately. All three come
+    // from one sample in one draw, so they cannot disagree — and a log showing
+    // them disagree would disprove that, which is the open question from the
+    // 2026-08-10 ride.
+    private function logShift(rearPos as Number?, teeth as Number?, ratio as String) as Void {
+        if (rearPos == _loggedRearPos) {
+            return;
+        }
+        _loggedRearPos = rearPos;
+
+        var now = System.getTimer();
+        var render = (_data.rearChangedAtMs > 0) ? (now - _data.rearChangedAtMs) : -1;
+        System.println("di2steps t=" + now
+            + " rear=" + ((rearPos == null) ? "--" : rearPos.toString())
+            + " teeth=" + ((teeth == null) ? "--" : teeth.toString())
+            + " ratio=" + ratio
+            + " render=" + render + "ms");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

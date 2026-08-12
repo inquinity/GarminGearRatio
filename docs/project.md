@@ -239,13 +239,23 @@ needs to capture at higher rate, or in more detail than nRF Connect provides).
   | On-device wizard | Works; teeth entered successfully |
   | Index convention (position 1 = easiest) | Confirmed in use |
 
-  **Residual timing jitter, by design, not a defect.** Updates are sometimes
-  instant and sometimes delayed by up to ~1s. Connect IQ redraws a data field
-  about once per second, and `onUpdate` is the only place we can sample; a shift
-  landing just after a redraw waits for the next one. The delay is therefore
-  uniform over 0–1s. Draw-time sampling removed the *systematic* full-second lag
-  (rendering the previous second's cached value); this remainder is the refresh
-  interval itself and there is no API to redraw faster. Do not chase it.
+  **Residual timing jitter — open question.** Updates are sometimes instant and
+  sometimes delayed by up to ~1s. The refresh interval explains part of it:
+  Connect IQ redraws a data field about once per second, so a shift landing just
+  after a redraw waits for the next, giving a delay uniform over 0–1s.
+
+  That was recorded here as settled, which was premature. The rider's follow-up
+  was that **gear position updated contemporaneously while the ratio did not** —
+  and the refresh-interval explanation predicts all five rows lag *together*.
+  `drawTest` samples the position once and derives position, teeth, and ratio
+  from it within a single draw, so they structurally cannot disagree. Either the
+  comparison was our field against Garmin's own continuously-updating gear
+  graphic (explained), or something unaccounted for is happening.
+
+  Shift-timing logging added (v1.0.12) to settle it: one line per rendered gear
+  change with the sampling-to-draw latency, plus position/teeth/ratio together
+  so any disagreement between them would be visible. See CLAUDE.md § Shift
+  timing logs for how to retrieve them from the device.
 
   Remaining work is UI only — `drawRide` and `drawGearConfig` are still stubs,
   and the Test screen is a diagnostic layout rather than a rider-facing one.
