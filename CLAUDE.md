@@ -55,6 +55,24 @@ competing with the Edge's own STEPS pairing, which is the thing that feeds
 `Activity.Info`. `docs/SCEM800-BLE-protocol.md` and the deleted
 `ShimanoBleDelegate.mc` (see git history) remain accurate if it is ever revived.
 
+**Don't revive it — it is unnecessary in every configuration, not just ours.**
+BLE was never a source of otherwise-unavailable gear data; it was a second path
+to data the head unit already had. Enumerating the cases:
+
+| Drivetrain | Gear data reaches the Edge via | BLE needed? |
+|---|---|---|
+| Di2 12-speed (built-in wireless) | Normal Di2 protocol | No |
+| Di2 11-speed + D-Fly, no ebike | Normal Di2 protocol — the Edge's own built-in Di2 data fields | No |
+| Di2 11-speed, no D-Fly, no ebike | Nothing transmits at all | No — no data exists to read, by any protocol |
+| Di2 11-speed + D-Fly + ebike | The ebike already transmits; D-Fly is redundant | No |
+| Di2 11-speed, no D-Fly, + ebike | The ebike (this bike) | No — solved via `Activity.Info` |
+
+Wherever gear data exists, something transmits it, the Edge is paired to it, and
+`Activity.Info` exposes the decoded result. The argument doesn't depend on
+Shimano specifics, so it holds for SRAM AXS and Campagnolo EPS too. BLE's only
+unique offering was eBike telemetry — which Connect IQ does not expose at all
+(see below), so even wanting that data wouldn't justify the path.
+
 **`AntPlus.Shifting`** — the 9.2.0 SDK doc for `getShiftingStatus()` states
 verbatim that it "Will not provide status for Shimano shifting systems."
 
