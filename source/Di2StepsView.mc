@@ -73,6 +73,12 @@ class Di2StepsView extends WatchUi.DataField {
             _data.onActivityInfo(info);
         }
 
+        // Logged here, not inside a draw mode: shift timing is a property of the
+        // data and this frame, not of which screen happens to be selected. It
+        // previously lived in drawTest, which meant riding in Ride mode — the
+        // normal case — produced no timing data at all.
+        logShift();
+
         var bg = getBackgroundColor();
         var fg = (bg == Graphics.COLOR_BLACK) ? Graphics.COLOR_WHITE : Graphics.COLOR_BLACK;
         dc.setColor(fg, bg);
@@ -150,31 +156,34 @@ class Di2StepsView extends WatchUi.DataField {
         lines.add("Front Teeth = " + numOr(_config.frontTeethAt(frontPos)));
         lines.add("Rear Position = " + posOr(rearPos));
         lines.add("Rear Teeth = " + numOr(_config.rearTeethAt(rearPos)));
-        var ratio = ratioText(frontPos, rearPos);
-        lines.add("Ratio = " + ratio);
-        logShift(rearPos, _config.rearTeethAt(rearPos), ratio);
+        lines.add("Ratio = " + ratioText(frontPos, rearPos));
         drawBlock(dc, lines, 4, 4, dc.getWidth() - 8, dc.getHeight() - 8);
     }
 
-    // One line per rendered gear change, for investigating shift-to-screen
-    // latency after a ride. Fires only when the drawn position actually changes
-    // — a few times a minute, not every frame — so it costs nothing in normal
-    // riding.
+    // One line per gear change, for investigating shift-to-screen latency after
+    // a ride. Fires only when the position actually changes — a few times a
+    // minute, not every frame — so it costs nothing in normal riding.
     //
-    // `render` is the gap between sampling first seeing this position and this
-    // draw putting it on screen. It is the only part of the delay this app
+    // Called from onUpdate, so it runs in EVERY display mode. It used to be
+    // called from drawTest, which meant a ride in Ride mode logged nothing.
+    //
+    // `render` is the gap between sampling first seeing this position and the
+    // frame that puts it on screen. It is the only part of the delay this app
     // controls; the head unit's own reporting delay is invisible to us.
     //
     // Position, teeth and ratio are logged together deliberately. All three come
-    // from one sample in one draw, so they cannot disagree — and a log showing
+    // from one sample in one frame, so they cannot disagree — and a log showing
     // them disagree would disprove that, which is the open question from the
     // 2026-08-10 ride.
-    private function logShift(rearPos as Number?, teeth as Number?, ratio as String) as Void {
+    private function logShift() as Void {
+        var rearPos = _data.rearPosition();
         if (rearPos == _loggedRearPos) {
             return;
         }
         _loggedRearPos = rearPos;
 
+        var teeth = _config.rearTeethAt(rearPos);
+        var ratio = ratioText(_data.frontPosition(_config), rearPos);
         var now = System.getTimer();
         var render = (_data.rearChangedAtMs > 0) ? (now - _data.rearChangedAtMs) : -1;
         System.println("di2steps t=" + now
