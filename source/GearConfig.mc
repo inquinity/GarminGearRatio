@@ -91,22 +91,6 @@ function inferChainrings(frontMax as Number?) as Number? {
     return (frontMax >= 1) ? frontMax : null;
 }
 
-// Should the Ride screen put the ratio and tooth pair SIDE BY SIDE rather than
-// stacking them? True for wide strips, where there is width to spare and no
-// height for a second line.
-//
-// The threshold is 2.6:1, chosen against the Edge 1050's actual slot geometry
-// (Devices/edge1050/simulator.json — 24 layouts, 17 distinct sizes): it catches
-// the wide strips at ~3.0 and leaves 480x198 (2.42) and 480x265 (1.81) stacked,
-// since those have the height for a big number plus a small line. Kept here as
-// a free function so it can be tested against every real slot size.
-function ridePrefersSideBySide(width as Number, height as Number) as Boolean {
-    if (height <= 0) {
-        return false;
-    }
-    return (width * 10) / height >= 26;
-}
-
 // Render teeth back to the CSV form stored in Properties.
 function teethToCsv(teeth as Array<Number>) as String {
     var s = "";

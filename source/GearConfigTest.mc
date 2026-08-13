@@ -152,54 +152,6 @@ function testInferChainringsRejectsZero(logger as Test.Logger) as Boolean {
     return $.inferChainrings(0) == null;
 }
 
-// ── Ride layout: stacked vs side-by-side, against real slot geometry ─────────
-//
-// Every size below is an actual data-field slot on the Edge 1050, taken from
-// Devices/edge1050/simulator.json (24 layouts, 17 distinct sizes). The point of
-// these tests is that the threshold is checked against the hardware's real
-// geometry rather than against my arithmetic.
-
-(:test)
-function testWideStripsGoSideBySide(logger as Test.Logger) as Boolean {
-    // Aspect ~3.0. Width to spare, no height for a second line.
-    return $.ridePrefersSideBySide(480, 158)
-        && $.ridePrefersSideBySide(480, 159)
-        && $.ridePrefersSideBySide(480, 160)
-        && $.ridePrefersSideBySide(480, 162);
-}
-
-(:test)
-function testTallAndSquareSlotsStack(logger as Test.Logger) as Boolean {
-    // A line break is the natural separator wherever there is height for one.
-    return !$.ridePrefersSideBySide(480, 800)    // full screen, 0.60
-        && !$.ridePrefersSideBySide(480, 399)    // half, 1.20
-        && !$.ridePrefersSideBySide(480, 318)    // third, 1.51
-        && !$.ridePrefersSideBySide(480, 265)    // 1.81
-        && !$.ridePrefersSideBySide(480, 198);   // 2.42 — deliberately stacked
-}
-
-(:test)
-function testHalfWidthSlotsStack(logger as Test.Logger) as Boolean {
-    // 239x158/160/162 — aspect ~1.5, the most common slot on the device (54
-    // occurrences). Must never take the side-by-side path.
-    return !$.ridePrefersSideBySide(239, 158)
-        && !$.ridePrefersSideBySide(239, 160)
-        && !$.ridePrefersSideBySide(239, 162);
-}
-
-(:test)
-function testSideBySideThresholdBoundary(logger as Test.Logger) as Boolean {
-    // 2.6:1 exactly is side-by-side; just under is not.
-    return $.ridePrefersSideBySide(260, 100)
-        && !$.ridePrefersSideBySide(259, 100);
-}
-
-(:test)
-function testRideLayoutHandlesZeroHeight(logger as Test.Logger) as Boolean {
-    // Guard against a divide-by-zero if a slot ever reports no height.
-    return !$.ridePrefersSideBySide(480, 0);
-}
-
 // ── property access must not throw ───────────────────────────────────────────
 //
 // Properties.getValue() throws on a key that isn't declared in

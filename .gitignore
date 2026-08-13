@@ -6,3 +6,6 @@ bin/
 
 # macOS
 .DS_Store
+
+# Simulator layout captures (tools/capture-layouts.sh)
+captures/

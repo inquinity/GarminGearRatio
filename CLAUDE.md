@@ -228,6 +228,32 @@ open "$SDK/bin/ConnectIQ.app"
 The simulator must already be running before `monkeydo`. 20 tests as of
 2026-08-09, all passing.
 
+### Layout captures (simulator)
+
+`tools/capture-layouts.sh` steps the running simulator through **all 24
+data-field layouts** and saves a PNG of each, so a layout change can be reviewed
+as a set of images instead of 24 manual menu trips.
+
+```bash
+open "$SDK/bin/ConnectIQ.app"
+"$SDK/bin/monkeydo" bin/di2steps.prg edge1050
+./tools/capture-layouts.sh                       # → captures/<timestamp>/
+./tools/capture-layouts.sh --match '1 Field'     # just one
+./tools/capture-layouts.sh --dry-run             # list, change nothing
+```
+
+It reads the layout list from the simulator's own menu rather than hardcoding
+it, so it works for other devices too. Needs **Accessibility** permission (it
+drives menus through System Events) and **Screen Recording** (screencapture);
+it brings the simulator to the front before each shot, because region capture
+grabs whatever is topmost.
+
+**The catch:** `Activity.Info` has no simulated drivetrain, so a normal build
+renders `--` and shows nothing about layout. To see real geometry, build a
+throwaway preview that forces `MODE_RIDE` and passes fixed strings to
+`drawRideBlock` — which exists as a separate method from `drawRide` for exactly
+this purpose. Don't commit that change.
+
 ### What the simulator CANNOT test
 
 **`Activity.Info`'s derailleur fields have no simulated drivetrain**, so gear
