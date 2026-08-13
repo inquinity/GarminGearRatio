@@ -33,7 +33,8 @@ print_colored() {
 
 PROCESS_NAME="simulator"
 output_dir="captures/$(date +%Y%m%d-%H%M%S)"
-settle_seconds=0.7
+poll_seconds=0.25
+timeout_seconds=6
 dry_run=0
 only_pattern=""
 
@@ -44,12 +45,18 @@ Usage: tools/capture-layouts.sh [options]
 Steps the running CIQ simulator through every data-field layout and saves a
 PNG of the simulator window for each one.
 
+Each capture is verified before it is saved: the script confirms the simulator
+marked the layout as active, then waits for the rendered window to actually
+change. A fixed pause is not enough — the menu updates instantly while the
+redraw lags, so a naive script saves the PREVIOUS layout under the new name.
+
 Options:
-  -o, --output DIR   Directory for PNGs (default: captures/<timestamp>)
-  -m, --match GLOB   Only layouts whose name matches, e.g. '1 Field' or '*B'
-  -s, --settle SECS  Pause after each layout change before capturing (default 0.7)
-  -n, --dry-run      List the layouts that would be captured, change nothing
-  -h, --help         Show this help
+  -o, --output DIR    Directory for PNGs (default: captures/<timestamp>)
+  -m, --match GLOB    Only layouts whose name matches, e.g. '1 Field' or '*B'
+  -p, --poll SECS     Interval between redraw checks (default 0.25)
+  -t, --timeout SECS  Give up waiting for a redraw after this (default 6)
+  -n, --dry-run       List the layouts that would be captured, change nothing
+  -h, --help          Show this help
 
 Examples:
   tools/capture-layouts.sh
@@ -62,7 +69,8 @@ while [ $# -gt 0 ]; do
     case "$1" in
         -o|--output)  output_dir="$2"; shift 2 ;;
         -m|--match)   only_pattern="$2"; shift 2 ;;
-        -s|--settle)  settle_seconds="$2"; shift 2 ;;
+        -p|--poll)    poll_seconds="$2"; shift 2 ;;
+        -t|--timeout) timeout_seconds="$2"; shift 2 ;;
         -n|--dry-run) dry_run=1; shift ;;
         -h|--help)    usage; exit 0 ;;
         *) print_colored "$COLOR_RED" "Unknown option: $1"; usage; exit 1 ;;
@@ -129,6 +137,72 @@ end tell
 EOF
 }
 
+# Name of the layout the simulator currently has checked. This is authoritative
+# for "did the click register", but says nothing about whether the window has
+# repainted yet — the mark flips immediately, the redraw does not.
+active_layout() {
+    osascript <<EOF 2>/dev/null
+tell application "System Events"
+  tell process "$PROCESS_NAME"
+    repeat with i in menu items of menu 1 of menu item "Layout" of menu 1 of menu bar item "Data Fields" of menu bar 1
+      try
+        if (value of attribute "AXMenuItemMarkChar" of i) is not missing value then
+          return name of i
+        end if
+      end try
+    end repeat
+    return ""
+  end tell
+end tell
+EOF
+}
+
+# Block until the simulator reports `layout_name` as active.
+wait_for_active_layout() {
+    local layout_name=$1
+    local waited=0
+    while [ "$(active_layout)" != "$layout_name" ]; do
+        sleep "$poll_seconds"
+        waited=$(awk -v a="$waited" -v b="$poll_seconds" 'BEGIN{print a+b}')
+        if awk -v w="$waited" -v t="$timeout_seconds" 'BEGIN{exit !(w>=t)}'; then
+            return 1
+        fi
+    done
+    return 0
+}
+
+# Capture into `out`, retrying until the image differs from `previous_hash` and
+# has stopped changing. Returns 0 on a verified-new frame, 1 on timeout.
+#
+# This is the part that actually fixes the off-by-one: without it the script
+# happily saves the last layout's pixels under the new layout's filename.
+capture_when_redrawn() {
+    local out=$1
+    local previous_hash=$2
+    local region=$3
+    local waited=0
+    local last_hash=""
+    local this_hash=""
+
+    while :; do
+        screencapture -x -R"$region" "$out"
+        this_hash="$(md5 -q "$out")"
+
+        # New frame AND stable across two polls — a partially painted window can
+        # differ from the previous layout while still not being finished.
+        if [ "$this_hash" != "$previous_hash" ] && [ "$this_hash" = "$last_hash" ]; then
+            return 0
+        fi
+        last_hash="$this_hash"
+
+        sleep "$poll_seconds"
+        waited=$(awk -v a="$waited" -v b="$poll_seconds" 'BEGIN{print a+b}')
+        if awk -v w="$waited" -v t="$timeout_seconds" 'BEGIN{exit !(w>=t)}'; then
+            return 1
+        fi
+    done
+}
+
 # "3 Fields A" -> "03-fields-a", so the directory sorts the way the menu reads.
 slugify() {
     printf '%s' "$1" \
@@ -144,6 +218,23 @@ fi
 
 captured=0
 skipped=0
+unverified=0
+
+# Seed the comparison with what is on screen BEFORE any layout change.
+#
+# Without this the first capture has nothing to be compared against, so a stale
+# frame sails through — which is exactly how a run that starts on "10 Fields"
+# ends up writing the 10-field rendering into 01-field.png.
+seed_capture="$(mktemp -t ciqseed).png"
+trap 'rm -f "$seed_capture"' EXIT
+previous_hash=""
+if [ "$dry_run" -eq 0 ]; then
+    seed_region="$(window_region)"
+    if [ -n "$seed_region" ]; then
+        screencapture -x -R"$seed_region" "$seed_capture"
+        previous_hash="$(md5 -q "$seed_capture")"
+    fi
+fi
 
 while IFS= read -r layout; do
     [ -z "$layout" ] && continue
@@ -162,8 +253,21 @@ while IFS= read -r layout; do
     fi
 
     mkdir -p "$output_dir"
+
+    # Already showing this layout? Then no redraw is coming and waiting for one
+    # would time out. The screen is correct as it stands, so capture it.
+    already_active=0
+    if [ "$(active_layout)" = "$layout" ]; then
+        already_active=1
+    fi
+
     select_layout "$layout"
-    sleep "$settle_seconds"
+
+    if ! wait_for_active_layout "$layout"; then
+        print_colored "$COLOR_RED" "  $layout: simulator never reported it active, skipping"
+        skipped=$((skipped + 1))
+        continue
+    fi
 
     region="$(window_region)"
     if [ -z "$region" ]; then
@@ -173,8 +277,20 @@ while IFS= read -r layout; do
     fi
 
     out="$output_dir/$(slugify "$layout").png"
-    screencapture -x -R"$region" "$out"
-    printf "  %-12s ${COLOR_BRIGHTYELLOW}%s${COLOR_RESET}\n" "$layout" "$out"
+    if [ "$already_active" -eq 1 ]; then
+        sleep "$poll_seconds"
+        screencapture -x -R"$region" "$out"
+        printf "  %-12s ${COLOR_BRIGHTYELLOW}%s${COLOR_RESET}  (already active)\n" "$layout" "$out"
+    elif capture_when_redrawn "$out" "$previous_hash" "$region"; then
+        printf "  %-12s ${COLOR_BRIGHTYELLOW}%s${COLOR_RESET}\n" "$layout" "$out"
+    else
+        # Either the redraw never came, or this layout genuinely renders
+        # identically to the last one — which can happen when the field is
+        # the same size in both. Say so rather than silently saving.
+        printf "  %-12s ${COLOR_RED}%s  (unchanged from previous — verify)${COLOR_RESET}\n" "$layout" "$out"
+        unverified=$((unverified + 1))
+    fi
+    previous_hash="$(md5 -q "$out")"
     captured=$((captured + 1))
 done <<< "$layout_list"
 
@@ -184,5 +300,18 @@ if [ "$dry_run" -eq 1 ]; then
 else
     print_colored "$COLOR_GREEN" "Captured $captured layout(s) to $output_dir"
     [ "$skipped" -gt 0 ] && print_colored "$COLOR_YELLOW" "Skipped $skipped."
+    if [ "$unverified" -gt 0 ]; then
+        print_colored "$COLOR_RED" "$unverified capture(s) could not be verified as a fresh redraw."
+        print_colored "$COLOR_YELLOW" "  Either raise --timeout, or those layouts render identically here."
+    fi
+
+    # Identical files mean two layouts produced the same pixels — usually a
+    # missed redraw, occasionally two layouts that really do look the same.
+    dupes="$(md5 -q "$output_dir"/*.png 2>/dev/null | sort | uniq -d | wc -l | tr -d " ")"
+    if [ "${dupes:-0}" -gt 0 ]; then
+        print_colored "$COLOR_RED" "$dupes duplicate image(s) detected — inspect before trusting these."
+    else
+        print_colored "$COLOR_GREEN" "All captures are distinct."
+    fi
     print_colored "$COLOR_YELLOW" "  open $output_dir"
 fi
