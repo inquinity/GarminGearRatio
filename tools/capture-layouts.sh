@@ -36,14 +36,52 @@ output_dir="captures/$(date +%Y%m%d-%H%M%S)"
 poll_seconds=0.25
 timeout_seconds=6
 dry_run=0
+capture_all=0
 only_pattern=""
+
+# Minimum set of layouts that still exercises every distinct slot size on the
+# Edge 1050 — 10 of the 24, so a review run is well under half the captures.
+#
+# Derived (not guessed) from the device's own geometry in
+#   ~/Library/Application Support/Garmin/ConnectIQ/Devices/edge1050/simulator.json
+# by solving the set-cover exactly over the 17 distinct field sizes. Seven of
+# these are forced: each owns a size no other layout offers. The last three
+# exist only to reach 239x160, 239x162 and 480x160.
+#
+#   1 Field      480x800
+#   2 Fields     480x399
+#   3 Fields A   480x265, 480x266
+#   3 Fields B   480x159, 480x318, 480x319
+#   3 Fields C   480x160, 480x318
+#   4 Fields A   480x198, 480x200
+#   4 Fields B   239x159, 480x318, 480x319
+#   4 Fields C   239x160, 480x318
+#   5 Fields B   239x158, 480x158, 480x162, 480x316
+#   5 Fields C   239x162, 480x158, 480x316
+#
+# To regenerate after an SDK update, re-solve the cover against that JSON.
+# Anything not listed here renders at a size one of these already covers.
+COVERAGE_LAYOUTS="1 Field
+2 Fields
+3 Fields A
+3 Fields B
+3 Fields C
+4 Fields A
+4 Fields B
+4 Fields C
+5 Fields B
+5 Fields C"
 
 usage() {
     cat <<'USAGE'
 Usage: tools/capture-layouts.sh [options]
 
-Steps the running CIQ simulator through every data-field layout and saves a
-PNG of the simulator window for each one.
+Steps the running CIQ simulator through data-field layouts and saves a PNG of
+the simulator window for each one.
+
+By default it captures only the 10 layouts needed to cover every distinct field
+size (of 24 total) — the rest render at a size one of those already shows. Use
+--all for the complete set.
 
 Each capture is verified before it is saved: the script confirms the simulator
 marked the layout as active, then waits for the rendered window to actually
@@ -51,6 +89,7 @@ change. A fixed pause is not enough — the menu updates instantly while the
 redraw lags, so a naive script saves the PREVIOUS layout under the new name.
 
 Options:
+  -a, --all           Capture all 24 layouts, not just the covering set
   -o, --output DIR    Directory for PNGs (default: captures/<timestamp>)
   -m, --match GLOB    Only layouts whose name matches, e.g. '1 Field' or '*B'
   -p, --poll SECS     Interval between redraw checks (default 0.25)
@@ -59,7 +98,8 @@ Options:
   -h, --help          Show this help
 
 Examples:
-  tools/capture-layouts.sh
+  tools/capture-layouts.sh                 # 10 covering layouts
+  tools/capture-layouts.sh --all           # all 24
   tools/capture-layouts.sh --match '1 Field' --output /tmp/one
   tools/capture-layouts.sh --dry-run
 USAGE
@@ -67,6 +107,7 @@ USAGE
 
 while [ $# -gt 0 ]; do
     case "$1" in
+        -a|--all)     capture_all=1; shift ;;
         -o|--output)  output_dir="$2"; shift 2 ;;
         -m|--match)   only_pattern="$2"; shift 2 ;;
         -p|--poll)    poll_seconds="$2"; shift 2 ;;
@@ -108,6 +149,29 @@ if [ -z "$layout_list" ]; then
     print_colored "$COLOR_YELLOW" "  this script. Grant it in System Settings > Privacy & Security >"
     print_colored "$COLOR_YELLOW" "  Accessibility, then retry."
     exit 1
+fi
+
+# Unless --all, reduce to the covering set. Every name is checked against the
+# menu first: on another device (different layout names) the intersection would
+# be wrong, so fall back to capturing everything rather than silently missing
+# sizes.
+if [ "$capture_all" -eq 0 ]; then
+    covering=""
+    missing=0
+    while IFS= read -r want; do
+        [ -z "$want" ] && continue
+        if printf '%s\n' "$layout_list" | grep -qxF "$want"; then
+            covering="$covering$want"$'\n'
+        else
+            missing=1
+        fi
+    done <<< "$COVERAGE_LAYOUTS"
+
+    if [ "$missing" -eq 1 ]; then
+        print_colored "$COLOR_YELLOW" "This device's layouts don't match the known covering set; capturing all."
+    else
+        layout_list="$covering"
+    fi
 fi
 
 # ── Helpers ──────────────────────────────────────────────────────────────────

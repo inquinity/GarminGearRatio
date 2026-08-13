@@ -230,20 +230,30 @@ The simulator must already be running before `monkeydo`. 20 tests as of
 
 ### Layout captures (simulator)
 
-`tools/capture-layouts.sh` steps the running simulator through **all 24
-data-field layouts** and saves a PNG of each, so a layout change can be reviewed
-as a set of images instead of 24 manual menu trips.
+`tools/capture-layouts.sh` steps the running simulator through data-field
+layouts and saves a PNG of each, so a layout change can be reviewed as a set of
+images instead of manual menu trips.
 
 ```bash
 open "$SDK/bin/ConnectIQ.app"
 "$SDK/bin/monkeydo" bin/di2steps.prg edge1050
-./tools/capture-layouts.sh                       # → captures/<timestamp>/
+./tools/capture-layouts.sh                       # 10 covering layouts
+./tools/capture-layouts.sh --all                 # all 24
 ./tools/capture-layouts.sh --match '1 Field'     # just one
 ./tools/capture-layouts.sh --dry-run             # list, change nothing
 ```
 
+**It captures 10 layouts by default, not 24.** Those 10 are the exact minimum
+that still exercises every one of the 17 distinct field sizes — solved as a
+set-cover against `Devices/edge1050/simulator.json`, not estimated. Seven are
+forced (each owns a size no other layout offers); the other three exist only to
+reach 239x160, 239x162 and 480x160. The remaining 14 layouts render the field at
+a size one of the 10 already shows, so they add pictures but no information.
+`--all` captures everything.
+
 It reads the layout list from the simulator's own menu rather than hardcoding
-it, so it works for other devices too. Needs **Accessibility** permission (it
+it, and falls back to capturing everything if the device's layout names don't
+match the known covering set. Needs **Accessibility** permission (it
 drives menus through System Events) and **Screen Recording** (screencapture);
 it brings the simulator to the front before each shot, because region capture
 grabs whatever is topmost.
