@@ -82,6 +82,50 @@ tree; `Activity.Info` has no assist/battery/range member and AntPlus has no
 eBike class. Those are firmware-internal native fields. BLE is the only possible
 source, which is what the removal above costs.
 
+## UI guiding principle: parity with Garmin's own fields
+
+**A Connect IQ field sits among native ones. It should look like one of them.**
+Anything that stands out — a different label size, a number on a different
+baseline, an annotation no native field would show — reads as out of place even
+when it is individually well designed.
+
+So the Ride screen does not invent sizes or positions. It reproduces what the
+device itself specifies for a native field in the same slot, taken from:
+
+```
+~/Library/Application Support/Garmin/ConnectIQ/Devices/edge1050/simulator.json
+  layouts[0].datafields.datafields[].fields[]   → label/data font + baseline y
+  fonts[fontSet=ww]                             → the size of every font
+```
+
+`source/RideLayout.mc` holds that as a table, one row per slot size, with the
+full derivation in its header comment. **Consult the device file before changing
+any of it** — the numbers are measurements, not preferences.
+
+What this buys, and what it costs:
+
+| Slots | Label | Value | Parity |
+|---|---|---|---|
+| 239x158/160/162, 480x158/160/162 | `FONT_GLANCE` | `FONT_NUMBER_HOT` | **`FONT_GLANCE` IS `glanceFont`; value −3%** |
+| 480x198 | `FONT_LARGE` +6% | `FONT_NUMBER_THAI_HOT` −6% | close |
+| 480x265 and larger | `FONT_LARGE` | `FONT_NUMBER_THAI_HOT` | value **−29% to −35%** |
+
+**Connect IQ cannot match the data font on large slots.** Garmin's private
+`simExtNumber4`/`8` are bigger than anything the API exposes. That is a platform
+limit; don't attempt to work around it by, say, drawing digits as graphics.
+
+Two consequences worth keeping:
+
+- **Centre on their block, don't pin to their baseline.** Where their font is
+  larger, their glyphs occupy a taller block above the baseline; pinning our
+  smaller glyphs to that baseline strands the number low with a void beneath the
+  label. `centredOnGarminsBlock()` handles this, and collapses to plain baseline
+  alignment where the fonts match.
+- **The tooth fraction is dropped, not shrunk.** Narrow slots have no room
+  beneath the number because the native data font runs to the bottom of the
+  cell. A native field would show nothing there, so neither do we —
+  `FONT_SMALL` is the floor.
+
 ## App type & structure
 
 Single `type="datafield"` app, `edge1050`, **no permissions**. "Pages" are

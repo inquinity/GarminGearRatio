@@ -265,3 +265,38 @@ needs to capture at higher rate, or in more detail than nRF Connect provides).
 
   Remaining work is UI only — `drawRide` and `drawGearConfig` are still stubs,
   and the Test screen is a diagnostic layout rather than a rider-facing one.
+- 2026-08-13: **UI principle adopted: parity with Garmin's native fields.**
+  On-device photos showed the field reading as "less readable and out of place"
+  beside native ones. Root cause was twofold: our font ladder was text fonts
+  capped at 61px where Garmin uses numeric fonts up to 136px, and our label and
+  spacing were invented rather than matched.
+
+  The fix is to stop inventing. `Devices/edge1050/simulator.json` specifies, per
+  slot size, the label font, data font and baseline of a native field — plus the
+  size of every font. `source/RideLayout.mc` now encodes that table.
+
+  Findings from it:
+  - `FONT_GLANCE` **is** `glanceFont`, Garmin's label font on all narrow/strip
+    slots — identical, not approximated.
+  - `FONT_NUMBER_HOT` is within 3% of `simExtNumber3`, their data font there.
+  - Their large-slot data fonts (`simExtNumber4` 47.6, `simExtNumber8` 44.0) are
+    29-35% larger than `FONT_NUMBER_THAI_HOT` (31.1), the biggest Connect IQ
+    exposes. **Unmatchable** — a platform limit, recorded so it isn't re-tried.
+
+  So parity is essentially exact on 79 of the 105 field instances, close on
+  480x198, and size-limited above that.
+
+  Two design consequences: our glyphs are centred on the block Garmin's would
+  occupy rather than pinned to their baseline (pinning stranded the number low
+  when their font is bigger), and the tooth fraction is dropped rather than
+  shrunk where there is no room — narrow slots show ratio only, as the rider
+  anticipated.
+
+  Also this round: shift-timing logging moved from `drawTest` to `onUpdate`, so
+  it records in Ride mode — previously a ride in the normal display mode logged
+  nothing. And `tools/capture-layouts.sh` gained verified captures (it was
+  silently saving each layout under the next one's name) and a covering-set
+  default of 10 layouts instead of 24, solved as an exact set-cover over the 17
+  distinct slot sizes.
+
+  **Not yet ridden:** v1.0.18 parity build is unvalidated on the road.
