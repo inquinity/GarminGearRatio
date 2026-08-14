@@ -109,21 +109,23 @@ class Di2StepsView extends WatchUi.DataField {
     // the simulator has no drivetrain, so live data renders as "--" and shows
     // nothing about the layout.
     private function drawRideBlock(dc as Graphics.Dc, ratio as String, teeth as String?) as Void {
-        var margin = 4;
-        var w = dc.getWidth()  - 2 * margin;
-        var h = dc.getHeight() - 2 * margin;
-        var cx = dc.getWidth() / 2;
+        // Full slot dimensions, no margin: the parity geometry is expressed in
+        // the device's own slot coordinates, so insetting would shift everything
+        // off the native baselines.
+        var w  = dc.getWidth();
+        var h  = dc.getHeight();
+        var cx = w / 2;
 
         var layout = $.computeRideLayout(dc, w, h, RIDE_LABEL, ratio, teeth);
 
         if (layout.showLabel) {
-            dc.drawText(cx, margin + layout.labelY, layout.labelFont, RIDE_LABEL,
+            dc.drawText(cx, layout.labelY, layout.labelFont, RIDE_LABEL,
                         Graphics.TEXT_JUSTIFY_CENTER);
         }
-        dc.drawText(cx, margin + layout.valueY, layout.valueFont, ratio,
+        dc.drawText(cx, layout.valueY, layout.valueFont, ratio,
                     Graphics.TEXT_JUSTIFY_CENTER);
         if (layout.showTeeth && teeth != null) {
-            dc.drawText(cx, margin + layout.teethY, layout.teethFont, teeth,
+            dc.drawText(cx, layout.teethY, layout.teethFont, teeth,
                         Graphics.TEXT_JUSTIFY_CENTER);
         }
     }

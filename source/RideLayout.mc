@@ -1,22 +1,48 @@
 import Toybox.Graphics;
 import Toybox.Lang;
 
-// Geometry for the Ride screen, computed separately from drawing so it can be
-// probed and tested at every real slot size without a device.
+// Ride-screen geometry, matched to Garmin's own data fields.
 //
-// The whole point of this class is that label + value + teeth are laid out as
-// ONE GROUP and that group is centred in the slot. The previous version centred
-// each element inside its own horizontal band, which on a 480x800 screen threw
-// the ratio and the teeth to opposite ends with a void between them.
+// GUIDING PRINCIPLE: parity. A Connect IQ field sitting next to native fields
+// should look like one of them, not like a visitor. So rather than inventing
+// sizes and positions, this reproduces what the device itself specifies for a
+// native field in the same slot.
+//
+// Everything below is lifted from the device definition:
+//   ~/Library/Application Support/Garmin/ConnectIQ/Devices/edge1050/simulator.json
+//     layouts[0].datafields.datafields[].fields[]
+// which gives, per slot size, the label font, the data font, and the BASELINE y
+// of each — slot-relative, identical for every instance of a given size.
+//
+// Font mapping (Garmin's internal name → nearest Connect IQ font, by the `size`
+// values in that same file's `fonts` section):
+//
+//   glanceFont     8.43  → FONT_GLANCE          8.43   IDENTICAL FONT
+//   simExtNumber3 25.65  → FONT_NUMBER_HOT     24.92   -3%
+//   simExtNumber5 14.66  → FONT_LARGE          15.57   +6%
+//   simExtNumber7 32.98  → FONT_NUMBER_THAI_HOT 31.15  -6%
+//   simExtNumber1 18.32  → FONT_LARGE          15.57  -15%
+//   simExtNumber8 43.97  → FONT_NUMBER_THAI_HOT 31.15 -29%  cannot match
+//   simExtNumber4 47.64  → FONT_NUMBER_THAI_HOT 31.15 -35%  cannot match
+//
+// The last two are a platform limit, not a choice: Garmin's private data fonts
+// for large slots are bigger than anything Connect IQ exposes. On the narrow and
+// strip slots — 79 of the 105 field instances across all layouts — parity is
+// essentially exact.
+//
+// BASELINES, not tops. Connect IQ's drawText takes the top of the text box, so
+// each y here is converted with `baseline - getFontAscent(font)`. The box then
+// extends `descent` past the baseline, which can exceed the slot; that region is
+// empty for digits, so nothing clips. Aligning baselines is what puts our number
+// on the same line as the neighbouring native field.
 class RideLayout {
-    public var valueFont as Graphics.FontDefinition = Graphics.FONT_XTINY;
-    public var labelFont as Graphics.FontDefinition = Graphics.FONT_XTINY;
+    public var valueFont as Graphics.FontDefinition = Graphics.FONT_NUMBER_HOT;
+    public var labelFont as Graphics.FontDefinition = Graphics.FONT_GLANCE;
     public var teethFont as Graphics.FontDefinition = Graphics.FONT_XTINY;
 
-    public var showLabel as Boolean = false;
+    public var showLabel as Boolean = true;
     public var showTeeth as Boolean = false;
 
-    // Top y of each element, already centred as a group within the slot.
     public var labelY as Number = 0;
     public var valueY as Number = 0;
     public var teethY as Number = 0;
@@ -25,145 +51,143 @@ class RideLayout {
     }
 }
 
-// Value font ladder, smallest → largest. The NUMBER_* fonts are what Garmin's
-// own data fields use; the text fonts stop at 61px, which is why this field
-// looked lost in its slot before. NUMBER_* glyph sets cover digits, ".", ":"
-// and "-" only — fine for "2.76" and "47:17", useless for a label.
-const RIDE_VALUE_FONTS = [
-    Graphics.FONT_XTINY,
-    Graphics.FONT_TINY,
-    Graphics.FONT_SMALL,
-    Graphics.FONT_MEDIUM,
-    Graphics.FONT_LARGE,
-    Graphics.FONT_NUMBER_MILD,
-    Graphics.FONT_NUMBER_MEDIUM,
-    Graphics.FONT_NUMBER_HOT,
-    Graphics.FONT_NUMBER_THAI_HOT
-];
+// Font identifiers used by the slot table below.
+const PF_GLANCE    = 0;   // glanceFont
+const PF_LARGE     = 1;   // simExtNumber1 / simExtNumber5
+const PF_HOT       = 2;   // simExtNumber3
+const PF_THAI_HOT  = 3;   // simExtNumber4 / 7 / 8
 
-// Label and teeth sizes paired to each value font, indexed to match
-// RIDE_VALUE_FONTS. Subordinate text scales WITH the number rather than with
-// the slot: sizing it off slot height alone produced a 21px fraction under a
-// 136px ratio, which was unreadable, and a 28px label on a full screen, which
-// was lost.
+function parityFont(id as Number) as Graphics.FontDefinition {
+    if (id == $.PF_GLANCE)   { return Graphics.FONT_GLANCE; }
+    if (id == $.PF_LARGE)    { return Graphics.FONT_LARGE; }
+    if (id == $.PF_HOT)      { return Graphics.FONT_NUMBER_HOT; }
+    return Graphics.FONT_NUMBER_THAI_HOT;
+}
+
+// One row per distinct slot size the Edge 1050 offers:
+//   [ width, height, labelFontId, labelBaselineY, labelScale%,
+//                    valueFontId, valueBaselineY, valueScale% ]
 //
-// The pairing also means the layout would rather step the number down one font
-// than shrink its annotations into illegibility — so a 480x198 slot takes a
-// 109px ratio with a 38px fraction over a 136px ratio with a 21px one.
-const RIDE_LABEL_FONTS = [
-    Graphics.FONT_XTINY,   // XTINY
-    Graphics.FONT_XTINY,   // TINY
-    Graphics.FONT_XTINY,   // SMALL
-    Graphics.FONT_XTINY,   // MEDIUM
-    Graphics.FONT_XTINY,   // LARGE
-    Graphics.FONT_XTINY,   // NUMBER_MILD    71px
-    Graphics.FONT_XTINY,   // NUMBER_MEDIUM  82px
-    Graphics.FONT_SMALL,   // NUMBER_HOT    109px
-    Graphics.FONT_MEDIUM   // NUMBER_THAI_HOT 136px
+// The scale is Garmin's font size as a percentage of ours, from the `fonts`
+// section of the same file. It exists because we cannot always match their
+// size: where their font is larger, their glyphs occupy a taller block above
+// the baseline, and pinning our smaller glyphs to that same baseline leaves a
+// void above the number. Instead we centre our block where theirs sits — see
+// centredOnGarminsBlock(). Where the fonts nearly match (100-106%) this is
+// within a pixel or two of plain baseline alignment.
+//
+//   glanceFont/FONT_GLANCE          100%    simExtNumber3/NUMBER_HOT   103%
+//   simExtNumber5/FONT_LARGE         94%    simExtNumber7/THAI_HOT     106%
+//   simExtNumber1/FONT_LARGE        118%    simExtNumber8/THAI_HOT     141%
+//                                           simExtNumber4/THAI_HOT     153%
+//
+// All 17 sizes are listed verbatim rather than derived; 239 and 480 variants
+// differ slightly in baseline, not only in x-centre.
+const PARITY_SLOTS = [
+    [480, 800, $.PF_LARGE,  340, 118, $.PF_THAI_HOT, 507, 153],
+    [480, 399, $.PF_LARGE,  139, 118, $.PF_THAI_HOT, 306, 153],
+    [480, 319, $.PF_LARGE,   97,  94, $.PF_THAI_HOT, 256, 153],
+    [480, 318, $.PF_LARGE,   97,  94, $.PF_THAI_HOT, 256, 153],
+    [480, 316, $.PF_LARGE,   96,  94, $.PF_THAI_HOT, 255, 153],
+    [480, 266, $.PF_LARGE,   76,  94, $.PF_THAI_HOT, 225, 141],
+    [480, 265, $.PF_LARGE,   76,  94, $.PF_THAI_HOT, 225, 141],
+    [480, 200, $.PF_LARGE,   59,  94, $.PF_THAI_HOT, 178, 106],
+    [480, 198, $.PF_LARGE,   59,  94, $.PF_THAI_HOT, 178, 106],
+    [480, 162, $.PF_GLANCE,  44, 100, $.PF_HOT,      131, 103],
+    [480, 160, $.PF_GLANCE,  44, 100, $.PF_HOT,      131, 103],
+    [480, 159, $.PF_GLANCE,  45, 100, $.PF_HOT,      136, 103],
+    [480, 158, $.PF_GLANCE,  44, 100, $.PF_HOT,      131, 103],
+    [239, 162, $.PF_GLANCE,  44, 100, $.PF_HOT,      135, 103],
+    [239, 160, $.PF_GLANCE,  44, 100, $.PF_HOT,      135, 103],
+    [239, 159, $.PF_GLANCE,  45, 100, $.PF_HOT,      136, 103],
+    [239, 158, $.PF_GLANCE,  44, 100, $.PF_HOT,      135, 103]
 ];
 
-const RIDE_TEETH_FONTS = [
-    Graphics.FONT_XTINY,
-    Graphics.FONT_XTINY,
-    Graphics.FONT_XTINY,
-    Graphics.FONT_XTINY,
-    Graphics.FONT_XTINY,
-    Graphics.FONT_TINY,    // NUMBER_MILD     71px → 28px
-    Graphics.FONT_SMALL,   // NUMBER_MEDIUM   82px → 33px
-    Graphics.FONT_MEDIUM,  // NUMBER_HOT     109px → 38px
-    Graphics.FONT_MEDIUM   // NUMBER_THAI_HOT 136px → 38px
-];
+// Top y for drawText so our glyphs sit centred where Garmin's would.
+//
+// Digits have no descender, so a native value visually occupies
+// [baseline - theirAscent, baseline]. We centre our own [y, y + ourAscent] on
+// the middle of that. When the fonts match, this collapses to
+// `baseline - ourAscent`, i.e. plain baseline alignment.
+function centredOnGarminsBlock(baseline as Number, ourAscent as Number, scalePct as Number) as Number {
+    var theirAscent = (ourAscent * scalePct) / 100;
+    var theirCentre = baseline - theirAscent / 2;
+    return theirCentre - ourAscent / 2;
+}
 
-// Below this the number is small enough that annotations stop earning their
-// space. 3 = FONT_MEDIUM.
-const RIDE_MIN_BARE = 3;
-
-const RIDE_GAP = 4;
-
-// Largest value font whose height fits `budget` and whose rendering of `text`
-// fits `width`. Returns an index into RIDE_VALUE_FONTS, or -1 if none fit.
-function rideFitValue(dc as Graphics.Dc, text as String, width as Number, budget as Number) as Number {
-    var best = -1;
-    for (var i = 0; i < $.RIDE_VALUE_FONTS.size(); i++) {
-        var f = $.RIDE_VALUE_FONTS[i];
-        if (dc.getFontHeight(f) <= budget && dc.getTextWidthInPixels(text, f) <= width) {
-            best = i;
+// Row for this slot: exact match, else the closest by height. The fallback
+// matters for other devices and for future firmware that adds a size — a near
+// neighbour still looks native, where inventing a layout would not.
+function parityRowFor(width as Number, height as Number) as Array<Number> {
+    var best = $.PARITY_SLOTS[0];
+    var bestScore = 999999;
+    for (var i = 0; i < $.PARITY_SLOTS.size(); i++) {
+        var row = $.PARITY_SLOTS[i];
+        if (row[0] == width && row[1] == height) {
+            return row;
+        }
+        // Height dominates: it decides the font tier. Width only separates the
+        // half-width column from the full-width one.
+        var score = (height - row[1]).abs() + ((width - row[0]).abs() > 100 ? 500 : 0);
+        if (score < bestScore) {
+            bestScore = score;
+            best = row;
         }
     }
     return best;
 }
 
-// Lay out the Ride screen inside a w×h box.
+// Lay out the Ride screen for a slot of w x h, in slot coordinates.
 //
-// Tries the full group first, then sheds the teeth, then the label — always
-// protecting the number, because the ratio is the reason the field exists.
+// `teeth` is drawn only where Garmin's own geometry leaves room beneath the
+// number. On the narrow and strip slots the native data font runs to the bottom
+// of the cell, so there is none — the fraction is dropped rather than shrunk
+// into the margin, because parity beats completeness here.
 function computeRideLayout(dc as Graphics.Dc, w as Number, h as Number,
                            label as String, value as String, teeth as String?) as RideLayout {
     var out = new RideLayout();
+    var row = $.parityRowFor(w, h);
 
-    // Three passes, each walking the value fonts from largest down. Shedding an
-    // element is a LAST resort — a smaller ratio with a readable fraction beats
-    // a huge ratio with none, which is why the whole group is tried at every
-    // size before pass 2 begins.
-    var i;
+    out.labelFont = $.parityFont(row[2]);
+    out.valueFont = $.parityFont(row[5]);
+    out.showLabel = true;
 
-    // Pass 1: label + value + teeth.
+    var labelAscent = Graphics.getFontAscent(out.labelFont);
+    var valueAscent = Graphics.getFontAscent(out.valueFont);
+
+    out.labelY = $.centredOnGarminsBlock(row[3], labelAscent, row[4]);
+    out.valueY = $.centredOnGarminsBlock(row[6], valueAscent, row[7]);
+
+    if (out.labelY < 0) {
+        out.labelY = 0;
+    }
+    if (out.valueY < 0) {
+        out.valueY = 0;
+    }
+
     if (teeth != null) {
-        for (i = $.RIDE_VALUE_FONTS.size() - 1; i >= $.RIDE_MIN_BARE; i--) {
-            var vFont = $.RIDE_VALUE_FONTS[i];
-            var lFont = $.RIDE_LABEL_FONTS[i];
-            var tFont = $.RIDE_TEETH_FONTS[i];
-            var vH = dc.getFontHeight(vFont);
-            var lH = dc.getFontHeight(lFont);
-            var tH = dc.getFontHeight(tFont);
-            var total = lH + $.RIDE_GAP + vH + $.RIDE_GAP + tH;
-            if (total <= h
-                && dc.getTextWidthInPixels(value, vFont) <= w
-                && dc.getTextWidthInPixels(teeth, tFont) <= w) {
-                out.valueFont = vFont;
-                out.labelFont = lFont;
-                out.teethFont = tFont;
-                out.showLabel = true;
+        // Space beneath OUR glyphs, not Garmin's baseline: on the large slots
+        // our smaller number sits higher, and that is exactly where the room
+        // for a fraction comes from.
+        var valueBottom = out.valueY + valueAscent;
+        var below = h - valueBottom;
+
+        // FONT_SMALL is the floor deliberately. Anything smaller is unreadable
+        // at arm's length on a moving bike, and cramming it into a few spare
+        // pixels is precisely the "doesn't belong here" look that parity is
+        // meant to remove — a native field would simply show nothing there.
+        var candidates = [Graphics.FONT_GLANCE, Graphics.FONT_SMALL];
+        for (var i = 0; i < candidates.size(); i++) {
+            var f = candidates[i];
+            var fh = dc.getFontHeight(f);
+            if (fh + 6 <= below && dc.getTextWidthInPixels(teeth, f) <= w) {
+                out.teethFont = f;
                 out.showTeeth = true;
-                out.labelY = (h - total) / 2;
-                out.valueY = out.labelY + lH + $.RIDE_GAP;
-                out.teethY = out.valueY + vH + $.RIDE_GAP;
-                return out;
+                out.teethY = valueBottom + 4;
+                break;
             }
         }
     }
 
-    // Pass 2: label + value. The fraction goes first — it confirms configuration,
-    // which matters far less at a glance than the ratio itself.
-    for (i = $.RIDE_VALUE_FONTS.size() - 1; i >= $.RIDE_MIN_BARE; i--) {
-        var vFont2 = $.RIDE_VALUE_FONTS[i];
-        var lFont2 = $.RIDE_LABEL_FONTS[i];
-        var vH2 = dc.getFontHeight(vFont2);
-        var lH2 = dc.getFontHeight(lFont2);
-        var total2 = lH2 + $.RIDE_GAP + vH2;
-        if (total2 <= h && dc.getTextWidthInPixels(value, vFont2) <= w) {
-            out.valueFont = vFont2;
-            out.labelFont = lFont2;
-            out.showLabel = true;
-            out.labelY = (h - total2) / 2;
-            out.valueY = out.labelY + lH2 + $.RIDE_GAP;
-            return out;
-        }
-    }
-
-    // Pass 3: the number alone, as large as will fit.
-    for (i = $.RIDE_VALUE_FONTS.size() - 1; i >= 0; i--) {
-        var vFont3 = $.RIDE_VALUE_FONTS[i];
-        var vH3 = dc.getFontHeight(vFont3);
-        if (vH3 <= h && dc.getTextWidthInPixels(value, vFont3) <= w) {
-            out.valueFont = vFont3;
-            out.valueY = (h - vH3) / 2;
-            return out;
-        }
-    }
-
-    // Nothing fits at all — smallest font, centred, and let it clip.
-    out.valueFont = $.RIDE_VALUE_FONTS[0];
-    out.valueY = (h - dc.getFontHeight(out.valueFont)) / 2;
     return out;
 }

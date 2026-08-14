@@ -1,3 +1,4 @@
+import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.Test;
 
@@ -150,6 +151,92 @@ function testInferChainringsUnsampledIsNull(logger as Test.Logger) as Boolean {
 (:test)
 function testInferChainringsRejectsZero(logger as Test.Logger) as Boolean {
     return $.inferChainrings(0) == null;
+}
+
+// ── Ride layout parity with Garmin's native fields ───────────────────────────
+//
+// Fonts and baselines come from the device's own datafield spec
+// (Devices/edge1050/simulator.json). These tests pin the mapping so a future
+// "tidy-up" can't quietly drift the field back out of parity.
+
+function layoutDc() as Graphics.Dc {
+    var bmp = Graphics.createBufferedBitmap({:width=>480, :height=>800}).get();
+    return (bmp as Graphics.BufferedBitmap).getDc();
+}
+
+(:test)
+function testNarrowSlotUsesGlanceAndHot(logger as Test.Logger) as Boolean {
+    // 239x158 is the most common slot. Garmin uses glanceFont + simExtNumber3;
+    // FONT_GLANCE is literally the same font, FONT_NUMBER_HOT within 3%.
+    var dc = layoutDc();
+    var L = $.computeRideLayout(dc, 239, 158, "RATIO", "2.04", "47:23");
+    return L.labelFont == Graphics.FONT_GLANCE
+        && L.valueFont == Graphics.FONT_NUMBER_HOT;
+}
+
+(:test)
+function testNarrowSlotDropsTheFraction(logger as Test.Logger) as Boolean {
+    // Garmin's data font runs to the bottom of these cells, so there is no room
+    // beneath the number. Showing the fraction anyway is what made the field
+    // look out of place.
+    var dc = layoutDc();
+    return !$.computeRideLayout(dc, 239, 158, "RATIO", "2.04", "47:23").showTeeth
+        && !$.computeRideLayout(dc, 239, 160, "RATIO", "2.04", "47:23").showTeeth
+        && !$.computeRideLayout(dc, 480, 158, "RATIO", "2.04", "47:23").showTeeth
+        && !$.computeRideLayout(dc, 480, 198, "RATIO", "2.04", "47:23").showTeeth;
+}
+
+(:test)
+function testTallSlotsKeepTheFraction(logger as Test.Logger) as Boolean {
+    var dc = layoutDc();
+    return $.computeRideLayout(dc, 480, 800, "RATIO", "2.04", "47:23").showTeeth
+        && $.computeRideLayout(dc, 480, 399, "RATIO", "2.04", "47:23").showTeeth
+        && $.computeRideLayout(dc, 480, 265, "RATIO", "2.04", "47:23").showTeeth;
+}
+
+(:test)
+function testValueSitsWhereGarminsWould(logger as Test.Logger) as Boolean {
+    // 239x158: Garmin's data baseline is 135, and their font is 103% of ours, so
+    // our glyphs are centred on their block rather than pinned to the baseline.
+    // Where the fonts nearly match, the two rules agree within a pixel or two.
+    var dc = layoutDc();
+    var L = $.computeRideLayout(dc, 239, 158, "RATIO", "2.04", null);
+    var expected = $.centredOnGarminsBlock(135, Graphics.getFontAscent(Graphics.FONT_NUMBER_HOT), 103);
+    return L.valueY == expected
+        && (L.valueY - (135 - Graphics.getFontAscent(Graphics.FONT_NUMBER_HOT))).abs() <= 2;
+}
+
+(:test)
+function testLargeSlotNumberIsNotStrandedLow(logger as Test.Logger) as Boolean {
+    // 480x318: Garmin's data font is 153% of ours. Pinning to their baseline
+    // left our number floating at the bottom with a void beneath the label —
+    // visibly wrong beside a native field. Centring on their block lifts it.
+    var dc = layoutDc();
+    var L = $.computeRideLayout(dc, 480, 318, "RATIO", "2.04", "47:23");
+    var pinnedToBaseline = 256 - Graphics.getFontAscent(Graphics.FONT_NUMBER_THAI_HOT);
+    return L.valueY < pinnedToBaseline - 15;
+}
+
+(:test)
+function testUnknownSlotFallsBackToNearestHeight(logger as Test.Logger) as Boolean {
+    // Another device, or a firmware that adds a size: a near neighbour still
+    // looks native. 157 is one off 158.
+    var dc = layoutDc();
+    var L = $.computeRideLayout(dc, 239, 157, "RATIO", "2.04", null);
+    return L.labelFont == Graphics.FONT_GLANCE && L.valueFont == Graphics.FONT_NUMBER_HOT;
+}
+
+(:test)
+function testNothingIsPlacedAboveTheSlot(logger as Test.Logger) as Boolean {
+    var dc = layoutDc();
+    var sizes = [[480,800],[480,399],[480,318],[480,265],[480,198],[480,158],[239,160],[239,158]];
+    for (var i = 0; i < sizes.size(); i++) {
+        var L = $.computeRideLayout(dc, sizes[i][0], sizes[i][1], "RATIO", "2.04", "47:23");
+        if (L.labelY < 0 || L.valueY < 0 || L.teethY < 0) {
+            return false;
+        }
+    }
+    return true;
 }
 
 // ── property access must not throw ───────────────────────────────────────────
