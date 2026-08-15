@@ -195,6 +195,43 @@ function testTallSlotsKeepTheFraction(logger as Test.Logger) as Boolean {
 }
 
 (:test)
+function testFractionFillsTheBandItIsGiven(logger as Test.Logger) as Boolean {
+    // 480x399 (the 2-field slot) has 121px beneath the number. Picking the
+    // first font that fits gave FONT_GLANCE at 37px, 4px under the number, with
+    // ~80px of dead space below — reported on the road as too small and too
+    // close. The largest font that fits is FONT_LARGE.
+    var dc = layoutDc();
+    var L = $.computeRideLayout(dc, 480, 399, "RATIO", "2.04", "47:23");
+    return L.showTeeth && L.teethFont == Graphics.FONT_LARGE;
+}
+
+(:test)
+function testFractionIsNotCrammedUnderTheNumber(logger as Test.Logger) as Boolean {
+    // The gap above the fraction should be comparable to the gap below it, on
+    // every slot that shows one — and the fraction must still land inside the
+    // slot. A subscript hanging off the number is the failure this prevents.
+    var dc = layoutDc();
+    var sizes = [[480,800],[480,399],[480,318],[480,265]];
+    for (var i = 0; i < sizes.size(); i++) {
+        var h = sizes[i][1];
+        var L = $.computeRideLayout(dc, sizes[i][0], h, "RATIO", "2.04", "47:23");
+        if (!L.showTeeth) {
+            return false;
+        }
+        var valueBottom = L.valueY + Graphics.getFontAscent(L.valueFont);
+        var gap = L.teethY - valueBottom;
+        var fh = dc.getFontHeight(L.teethFont);
+        if (gap < 10 || gap > fh) {
+            return false;
+        }
+        if (L.teethY + fh > h + 2) {
+            return false;
+        }
+    }
+    return true;
+}
+
+(:test)
 function testValueSitsWhereGarminsWould(logger as Test.Logger) as Boolean {
     // 239x158: Garmin's data baseline is 135, and their font is 103% of ours, so
     // our glyphs are centred on their block rather than pinned to the baseline.

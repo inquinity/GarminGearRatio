@@ -114,7 +114,7 @@ What this buys, and what it costs:
 `simExtNumber4`/`8` are bigger than anything the API exposes. That is a platform
 limit; don't attempt to work around it by, say, drawing digits as graphics.
 
-Two consequences worth keeping:
+Three consequences worth keeping:
 
 - **Centre on their block, don't pin to their baseline.** Where their font is
   larger, their glyphs occupy a taller block above the baseline; pinning our
@@ -125,6 +125,14 @@ Two consequences worth keeping:
   beneath the number because the native data font runs to the bottom of the
   cell. A native field would show nothing there, so neither do we —
   `FONT_SMALL` is the floor.
+- **Where it IS shown, it fills the band it is given.** The space left beneath
+  our number is the *whole* budget for the fraction, so take the largest font
+  that fits and centre it in that band rather than the first font that fits,
+  pinned under the number. On 480x399 those differ by a lot: 121px of band,
+  `FONT_LARGE` centred with a 30px gap, versus `FONT_GLANCE` 4px under the
+  number with 80px of dead space — the 2026-08-14 "too close and too small"
+  report. The gap is capped at the fraction's own height so the full-screen
+  480x800 slot doesn't set it adrift.
 
 ## App type & structure
 

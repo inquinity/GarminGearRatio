@@ -172,18 +172,41 @@ function computeRideLayout(dc as Graphics.Dc, w as Number, h as Number,
         var valueBottom = out.valueY + valueAscent;
         var below = h - valueBottom;
 
-        // FONT_SMALL is the floor deliberately. Anything smaller is unreadable
-        // at arm's length on a moving bike, and cramming it into a few spare
+        // Largest font that fits the band, not the first one that does. On the
+        // 2-field slot the band is 121px tall, so settling for FONT_GLANCE (37)
+        // rendered the fraction as a subscript with 80px of void under it —
+        // reported on the road 2026-08-14 as "too close and too small".
+        //
+        // FONT_SMALL is still the floor. Anything smaller is unreadable at
+        // arm's length on a moving bike, and cramming it into a few spare
         // pixels is precisely the "doesn't belong here" look that parity is
-        // meant to remove — a native field would simply show nothing there.
-        var candidates = [Graphics.FONT_GLANCE, Graphics.FONT_SMALL];
+        // meant to remove — a narrow slot shows nothing there instead.
+        var candidates = [
+            Graphics.FONT_LARGE,
+            Graphics.FONT_MEDIUM,
+            Graphics.FONT_GLANCE,
+            Graphics.FONT_SMALL
+        ];
         for (var i = 0; i < candidates.size(); i++) {
             var f = candidates[i];
             var fh = dc.getFontHeight(f);
             if (fh + 6 <= below && dc.getTextWidthInPixels(teeth, f) <= w) {
                 out.teethFont = f;
                 out.showTeeth = true;
-                out.teethY = valueBottom + 4;
+
+                // Centred in the band, so the gap above the fraction matches
+                // the gap below it and the pair reads as two deliberate
+                // elements rather than a number with a tail.
+                //
+                // Capped at the fraction's own height because the band grows
+                // without bound: on the full-screen 480x800 slot centring
+                // alone would leave a 130px gap and the fraction would stop
+                // looking related to the number above it.
+                var gap = (below - fh) / 2;
+                if (gap > fh) {
+                    gap = fh;
+                }
+                out.teethY = valueBottom + gap;
                 break;
             }
         }
