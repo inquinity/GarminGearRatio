@@ -300,3 +300,37 @@ needs to capture at higher rate, or in more detail than nRF Connect provides).
   distinct slot sizes.
 
   **Not yet ridden:** v1.0.18 parity build is unvalidated on the road.
+- 2026-08-14: **Parity build ridden — three of four layouts confirmed, one fix.**
+  v1.0.18 on the road, photos in `device-images/IMG_1766..1769`. Rider verdict:
+  10-field (239x158) "perfect", 5-field wide (480x158) "perfect", 3-field
+  (IMG_1768) not matching Garmin's neighbouring gear field but "easier to see
+  and there are no negatives" — no action; Garmin's gear fields draw a custom
+  graphic rather than the standard data font, so there is no data-field spec to
+  match there and our larger number is a side effect of matching the real one.
+
+  The one defect was the 2-field slot (480x399): the tooth fraction "too close
+  and too small". Cause was in the fraction's font selection — first font that
+  fits, pinned 4px under the number. On that slot the band beneath the number is
+  121px, so it chose `FONT_GLANCE` (37px) and left ~80px of dead space.
+
+  Fixed by taking the largest font that fits and centring it in the band, with
+  the gap capped at the fraction's own height so the 480x800 slot doesn't set it
+  adrift. Resulting geometry, derived from the device's own font metrics:
+
+  | Slot | Band | Font | Gap |
+  |---|---|---|---|
+  | 480x800 | 321px | `FONT_LARGE` | 61 (capped) |
+  | 480x399 | 121px | `FONT_LARGE` | 30 |
+  | 480x318 |  90px | `FONT_LARGE` | 14 |
+  | 480x265 |  62px | `FONT_MEDIUM` | 12 |
+
+  `FONT_SMALL` remains the floor, so the three layouts the rider approved are
+  bit-identical: 480x158/198 and 239x158 have 23-28px of band and still drop the
+  fraction entirely.
+
+  **Build blocked mid-round:** macOS revoked this shell's access to protected
+  folders (`~/Documents` and iCloud Drive both return `Operation not permitted`),
+  and the signing key lives in iCloud Drive. The layout arithmetic was instead
+  cross-checked against the metrics in `Devices/edge1050/simulator.json`
+  directly. **v1.0.19 is unbuilt, untested and undeployed** — the 48 unit tests
+  and a simulator capture of the 2-field layout still need to run.
