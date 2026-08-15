@@ -328,9 +328,22 @@ needs to capture at higher rate, or in more detail than nRF Connect provides).
   bit-identical: 480x158/198 and 239x158 have 23-28px of band and still drop the
   fraction entirely.
 
-  **Build blocked mid-round:** macOS revoked this shell's access to protected
-  folders (`~/Documents` and iCloud Drive both return `Operation not permitted`),
-  and the signing key lives in iCloud Drive. The layout arithmetic was instead
-  cross-checked against the metrics in `Devices/edge1050/simulator.json`
-  directly. **v1.0.19 is unbuilt, untested and undeployed** — the 48 unit tests
-  and a simulator capture of the 2-field layout still need to run.
+  Verified: **48 unit tests pass** (46 + two new ones asserting 480x399 picks
+  `FONT_LARGE` and that the gap is at least 10px, no larger than the fraction's
+  own height, and lands inside the slot). Simulator captures of the 10-layout
+  covering set confirm it visually — `captures/20260814-213405`. The 1-field,
+  2-field and 3-field slots show the enlarged fraction; the 4- and 5-field slots
+  are unchanged and still drop it.
+
+  Note on 480x265 (3-field): the band is only 62px, so the fraction lands in
+  `FONT_MEDIUM` about 12px under the number. That is the honest limit of the
+  slot, not a repeat of the 480x399 bug — but it is the tightest of the three
+  that show a fraction, and worth a look on the next ride.
+
+  **Transient blocker worth recording:** macOS briefly revoked this shell's
+  access to protected folders (`~/Documents` and iCloud Drive both returned
+  `Operation not permitted`), which blocks builds outright because the signing
+  key lives in iCloud Drive. It cleared without intervention. If it recurs,
+  grant Full Disk Access to the terminal rather than moving the key.
+
+  **v1.0.19 is built and tested but NOT yet deployed** to the device.
