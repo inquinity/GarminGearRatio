@@ -30,12 +30,15 @@ class GearSettingsView extends WatchUi.View {
 
         // No title drawn: the system puts the app's name in the settings header
         // bar directly above this view.
+        // "Teeth:" separates the count from the sprockets. Without it the two
+        // ran together — "Rear gears: 11" above "12 14 16..." read as though 11
+        // were the first cog in the list.
         var lines = [];
         lines.add("Front gears: " + count(config.frontTeeth));
-        lines.addAll($.teethListLines(config.frontTeeth));
+        lines.addAll(labelledTeeth(config.frontTeeth));
         lines.add("");   // front and rear read as two groups, not one list
         lines.add("Rear gears: " + count(config.rearTeeth));
-        lines.addAll($.teethListLines(config.rearTeeth));
+        lines.addAll(labelledTeeth(config.rearTeeth));
 
         // Vertically centred as a block, so a 1x11 (five lines) and a 2x12 (six)
         // both sit sensibly rather than one drifting off the bottom.
@@ -51,6 +54,18 @@ class GearSettingsView extends WatchUi.View {
 
         var hint = configured ? "Press OK to change" : "Press OK to set up";
         dc.drawText(w / 2, h * 88 / 100, Graphics.FONT_TINY, hint, Graphics.TEXT_JUSTIFY_CENTER);
+    }
+
+    // The sprocket list under its own header, or nothing at all when unset —
+    // a bare "Teeth:" with no teeth beneath it would be worse than silence.
+    private function labelledTeeth(teeth as Array<Number>) as Array<String> {
+        var rows = $.teethListLines(teeth);
+        if (rows.size() == 0) {
+            return rows;
+        }
+        var out = ["Teeth:"] as Array<String>;
+        out.addAll(rows);
+        return out;
     }
 
     private function count(teeth as Array<Number>) as String {
