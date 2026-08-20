@@ -484,40 +484,36 @@ function testRatioRisesWithPosition(logger as Test.Logger) as Boolean {
     return true;
 }
 
-// ── Configuration overview: ratio range ──────────────────────────────────────
+// ── Configuration overview: sprocket list ────────────────────────────────────
 //
-// The settings screen's most useful line, and the one a rider would check a
-// wrong cassette against. Derived from the extreme tooth counts, so it must not
-// depend on gear position or on the order the teeth are stored in.
+// The settings screen lists the sprockets themselves, wrapped over several
+// lines. Always smallest-first, whatever order storage holds them in — the rear
+// is stored largest-first because position 1 is the easiest gear.
 
 (:test)
-function testRatioRangeSpansEasiestToHardest(logger as Test.Logger) as Boolean {
-    var c = new GearConfig();
-    c.frontTeeth = [47] as Array<Number>;
-    c.rearTeeth  = $.sortDescending([51, 45, 39, 33, 28, 24, 21, 18, 16, 14, 12] as Array<Number>);
-    // easiest 47/51 = 0.92, hardest 47/12 = 3.92
-    return $.ratioRangeText(c).equals("0.92 - 3.92");
+function testTeethListWrapsElevenSpeed(logger as Test.Logger) as Boolean {
+    var stored = $.sortDescending([51, 45, 39, 33, 28, 24, 21, 18, 16, 14, 12] as Array<Number>);
+    var lines = $.teethListLines(stored);
+    return lines.size() == 2
+        && lines[0].equals("12  14  16  18  21  24")
+        && lines[1].equals("28  33  39  45  51");
 }
 
 (:test)
-function testRatioRangeIgnoresStorageOrder(logger as Test.Logger) as Boolean {
-    var a = new GearConfig();
-    a.frontTeeth = [34, 50] as Array<Number>;
-    a.rearTeeth  = [30, 11] as Array<Number>;
-    var b = new GearConfig();
-    b.frontTeeth = [50, 34] as Array<Number>;
-    b.rearTeeth  = [11, 30] as Array<Number>;
-    return $.ratioRangeText(a).equals($.ratioRangeText(b))
-        && $.ratioRangeText(a).equals("1.13 - 4.55");
+function testTeethListSingleRingIsOneLine(logger as Test.Logger) as Boolean {
+    var lines = $.teethListLines([47] as Array<Number>);
+    return lines.size() == 1 && lines[0].equals("47");
 }
 
 (:test)
-function testRatioRangeUnconfigured(logger as Test.Logger) as Boolean {
-    var c = new GearConfig();
-    if (!$.ratioRangeText(c).equals("not set")) {
-        return false;
-    }
-    // One end configured is still not a range.
-    c.frontTeeth = [47] as Array<Number>;
-    return $.ratioRangeText(c).equals("not set");
+function testTeethListUnconfiguredHasNoLines(logger as Test.Logger) as Boolean {
+    return $.teethListLines([] as Array<Number>).size() == 0;
+}
+
+(:test)
+function testTeethListIsAlwaysSmallestFirst(logger as Test.Logger) as Boolean {
+    // Same cassette, opposite storage orders, identical display.
+    var a = $.teethListLines([11, 30, 21] as Array<Number>);
+    var b = $.teethListLines([30, 21, 11] as Array<Number>);
+    return a.size() == 1 && a[0].equals("11  21  30") && b[0].equals(a[0]);
 }
