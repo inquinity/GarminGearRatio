@@ -33,6 +33,7 @@ class GearSettingsView extends WatchUi.View {
         var lines = [];
         lines.add("Front gears: " + count(config.frontTeeth));
         lines.addAll($.teethListLines(config.frontTeeth));
+        lines.add("");   // front and rear read as two groups, not one list
         lines.add("Rear gears: " + count(config.rearTeeth));
         lines.addAll($.teethListLines(config.rearTeeth));
 
