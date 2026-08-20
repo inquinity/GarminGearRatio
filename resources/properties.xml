@@ -1,15 +1,5 @@
 <?xml version="1.0"?>
 <properties>
-    <!-- ── Which screen to render ───────────────────────────────────────────
-         Mirrors the DisplayMode enum in Di2StepsView.mc:
-           0 = RIDE        gear / ratio (rider-facing)
-           1 = GEAR_CONFIG drivetrain topology + tooth counts
-           2 = TEST        name/value table of every field (diagnostics)
-         Defaults to RIDE: that is the rider-facing screen, and the only one
-         offered in settings. TEST remains reachable by hand-editing this
-         property, which is what a diagnostic mode is for. -->
-    <property id="DisplayMode" type="Number">0</property>
-
     <!-- ── Drivetrain tooth counts (user-entered) ───────────────────────────
          These MUST be entered by hand. Activity.Info does expose teeth via
          frontDerailleurSize / rearDerailleurSize, but on the SC-EM800 they are

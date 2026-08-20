@@ -137,8 +137,8 @@ class TeethEntry {
 // anything the rider needs to reach on the bike has to be offered here;
 // settings.xml only drives Garmin Connect on the phone.
 //
-// That is why Display Mode appears below. It was briefly unreachable on the
-// device after this wizard was added.
+// Since display modes were removed, the only thing to reach here is the tooth
+// wizard — the status view itself carries the configuration overview.
 class GearSettingsDelegate extends WatchUi.BehaviorDelegate {
 
     function initialize() {
@@ -148,7 +148,6 @@ class GearSettingsDelegate extends WatchUi.BehaviorDelegate {
     function onSelect() as Boolean {
         var menu = new WatchUi.Menu2({:title => "Gear Ratio"});
         menu.addItem(new WatchUi.MenuItem("Tooth Counts", "Chainring and cassette", MENU_TEETH, {}));
-        menu.addItem(new WatchUi.MenuItem("Display Mode", $.displayModeName(), MENU_MODE, {}));
         WatchUi.pushView(menu, new SettingsMenuDelegate(), WatchUi.SLIDE_UP);
         return true;
     }
@@ -160,19 +159,7 @@ class GearSettingsDelegate extends WatchUi.BehaviorDelegate {
 }
 
 const MENU_TEETH = 1;
-const MENU_MODE  = 2;
 
-// Human-readable name of the current DisplayMode, for the menu subtitle and the
-// status screen. Mirrors the enum in Di2StepsView.
-function displayModeName() as String {
-    var m = Properties.getValue("DisplayMode");
-    if (m instanceof Lang.Number && m == 2) {
-        return "Test";
-    } else if (m instanceof Lang.Number && m == 1) {
-        return "Gear Config";
-    }
-    return "Ride";
-}
 
 // ── Settings menu ────────────────────────────────────────────────────────────
 class SettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
@@ -184,17 +171,6 @@ class SettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
     function onSelect(item as WatchUi.MenuItem) as Void {
         var id = item.getId();
         if (!(id instanceof Lang.Number)) {
-            return;
-        }
-
-        if (id == $.MENU_MODE) {
-            // Gear Config (mode 1) is deliberately not offered: drawGearConfig
-            // is still a stub, and a menu entry that renders a placeholder is
-            // worse than no entry.
-            var menu = new WatchUi.Menu2({:title => "Display Mode"});
-            menu.addItem(new WatchUi.MenuItem("Ride", "Gear ratio", 0, {}));
-            menu.addItem(new WatchUi.MenuItem("Test", "Diagnostics", 2, {}));
-            WatchUi.pushView(menu, new DisplayModeMenuDelegate(), WatchUi.SLIDE_LEFT);
             return;
         }
 
@@ -212,31 +188,6 @@ class SettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
             return;
         }
         $.startToothEntry($.chainringCount(), cogs, WatchUi.SLIDE_LEFT);
-    }
-
-    function onBack() as Void {
-        WatchUi.popView(WatchUi.SLIDE_DOWN);
-    }
-}
-
-// ── Display mode selection ───────────────────────────────────────────────────
-class DisplayModeMenuDelegate extends WatchUi.Menu2InputDelegate {
-
-    function initialize() {
-        Menu2InputDelegate.initialize();
-    }
-
-    function onSelect(item as WatchUi.MenuItem) as Void {
-        var id = item.getId();
-        if (!(id instanceof Lang.Number)) {
-            return;
-        }
-        Properties.setValue("DisplayMode", id as Number);
-
-        // Written directly, so onSettingsChanged() won't fire on its own — the
-        // running field would keep rendering the old mode until restart.
-        (Application.getApp() as Di2StepsApp).onSettingsChanged();
-        WatchUi.popView(WatchUi.SLIDE_DOWN);
     }
 
     function onBack() as Void {

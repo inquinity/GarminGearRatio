@@ -3,7 +3,14 @@ import Toybox.Lang;
 import Toybox.WatchUi;
 
 // Shown when the rider opens this data field's settings on the device.
-// Reports what is currently configured; OK starts the wizard, Back exits.
+//
+// This IS the configuration overview: everything the field knows about the
+// drivetrain on one screen — what was entered, what the head unit detected, and
+// the ratio range those produce. OK starts the wizard, Back exits.
+//
+// The ratio range is the most useful line and the reason the screen exists. It
+// is derived, so a transposed or truncated cassette shows up as a nonsense
+// spread here rather than as a wrong number mid-ride.
 //
 // Ported from ../GarminGearRatioVersion1/source/GearSettingsView.mc. Adapted: that app
 // derives its topology from a "Di2 profile" property, which this app does not
@@ -25,16 +32,35 @@ class GearSettingsView extends WatchUi.View {
         var config = new GearConfig();
         var configured = config.frontTeeth.size() > 0 && config.rearTeeth.size() > 0;
 
-        var frontLine = "Front: " + summarise(config.frontTeeth);
-        var rearLine  = "Rear: "  + summarise(config.rearTeeth);
-        var modeLine  = "Mode: "  + $.displayModeName();
-        var hint      = configured ? "Press OK to change" : "Press OK to set up";
+        var lines = [
+            "Front: " + summarise(config.frontTeeth),
+            "Rear: "  + summarise(config.rearTeeth),
+            "Ratio: " + $.ratioRangeText(config),
+            "Bike: "  + detected()
+        ];
+        var hint = configured ? "Press OK to change" : "Press OK to set up";
 
-        dc.drawText(w / 2, h * 1 / 10, Graphics.FONT_TINY,  "Gear Ratio", Graphics.TEXT_JUSTIFY_CENTER);
-        dc.drawText(w / 2, h * 3 / 10, Graphics.FONT_SMALL, frontLine,    Graphics.TEXT_JUSTIFY_CENTER);
-        dc.drawText(w / 2, h * 5 / 10, Graphics.FONT_SMALL, rearLine,     Graphics.TEXT_JUSTIFY_CENTER);
-        dc.drawText(w / 2, h * 7 / 10, Graphics.FONT_SMALL, modeLine,     Graphics.TEXT_JUSTIFY_CENTER);
-        dc.drawText(w / 2, h * 9 / 10, Graphics.FONT_TINY,  hint,         Graphics.TEXT_JUSTIFY_CENTER);
+        // No title drawn: the system puts the app's name in the settings header
+        // bar directly above this view, so drawing "Gear Ratio" again just
+        // repeated it and cost a line of space.
+        for (var i = 0; i < lines.size(); i++) {
+            dc.drawText(w / 2, h * (16 + 15 * i) / 100, Graphics.FONT_SMALL, lines[i],
+                        Graphics.TEXT_JUSTIFY_CENTER);
+        }
+        dc.drawText(w / 2, h * 88 / 100, Graphics.FONT_TINY, hint, Graphics.TEXT_JUSTIFY_CENTER);
+    }
+
+    // What the head unit itself reported, as opposed to what was typed in. A
+    // mismatch between this and the Rear line is the usual sign of a cassette
+    // entered with the wrong number of cogs.
+    private function detected() as String {
+        var cogs  = $.detectedRearCogs();
+        var rings = $.chainringCount();
+        var ringWord = (rings == 1) ? " ring" : " rings";
+        if (cogs == null) {
+            return "not seen yet";
+        }
+        return cogs.toString() + " cogs, " + rings.toString() + ringWord;
     }
 
     // Teeth as "38T" / "11..50 (11)" / "not set". Summarised by range and count
@@ -66,4 +92,30 @@ class GearSettingsView extends WatchUi.View {
         }
         return smallest.toString() + ".." + largest.toString() + " (" + n.toString() + ")";
     }
+}
+
+// Easiest to hardest, e.g. "0.92 - 4.27". Both ends come from the extreme
+// tooth counts rather than from gear positions, so it does not depend on the
+// bike being ridden or on which gear it is in.
+function ratioRangeText(config as GearConfig) as String {
+    var f = config.frontTeeth;
+    var r = config.rearTeeth;
+    if (f.size() == 0 || r.size() == 0) {
+        return "not set";
+    }
+    var easiest = $.minTeeth(f).toFloat() / $.maxTeeth(r).toFloat();
+    var hardest = $.maxTeeth(f).toFloat()  / $.minTeeth(r).toFloat();
+    return easiest.format("%.2f") + " - " + hardest.format("%.2f");
+}
+
+function minTeeth(teeth as Array<Number>) as Number {
+    var v = teeth[0];
+    for (var i = 1; i < teeth.size(); i++) { if (teeth[i] < v) { v = teeth[i]; } }
+    return v;
+}
+
+function maxTeeth(teeth as Array<Number>) as Number {
+    var v = teeth[0];
+    for (var i = 1; i < teeth.size(); i++) { if (teeth[i] > v) { v = teeth[i]; } }
+    return v;
 }

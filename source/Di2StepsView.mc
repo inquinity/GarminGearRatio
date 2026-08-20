@@ -1,21 +1,21 @@
 import Toybox.Activity;
-import Toybox.Application.Properties;
 import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.System;
 import Toybox.WatchUi;
 
-// Display modes, selected by the DisplayMode app-setting property.
-// There is no in-activity button navigation, so "pages" are chosen in settings.
-enum {
-    MODE_RIDE        = 0,  // gear / ratio — the rider-facing screen
-    MODE_GEAR_CONFIG = 1,  // drivetrain topology + tooth counts
-    MODE_TEST        = 2   // name/value table of every field, for diagnostics
-}
+// The field renders one screen: the ratio. There used to be a DisplayMode
+// setting choosing between Ride, Gear Config and Test, but a rider cannot tell
+// which mode a field is in by looking at it, and the setting was a state toggle
+// with no visible state — removed 2026-08-19.
+//
+// drawTest is kept below as a diagnostic. Flip this to true and rebuild to get
+// the name/value table back; there is deliberately no way to reach it at
+// runtime.
+const SHOW_DIAGNOSTICS = false;
 
 class Di2StepsView extends WatchUi.DataField {
 
-    private var _mode as Number = MODE_RIDE;
     private var _data as StepsData;
     private var _config as GearConfig;
 
@@ -41,18 +41,11 @@ class Di2StepsView extends WatchUi.DataField {
         DataField.initialize();
         _data = new StepsData();
         _config = new GearConfig();
-        loadSettings();
     }
 
     // ── Settings ──────────────────────────────────────────────────────────────
 
-    function loadSettings() as Void {
-        var m = Properties.getValue("DisplayMode");
-        _mode = (m instanceof Number) ? m : MODE_RIDE;
-    }
-
     function onSettingsChanged() as Void {
-        loadSettings();
         _config.load();
         WatchUi.requestUpdate();
     }
@@ -85,12 +78,10 @@ class Di2StepsView extends WatchUi.DataField {
         dc.clear();
         dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
 
-        if (_mode == MODE_RIDE) {
-            drawRide(dc);
-        } else if (_mode == MODE_GEAR_CONFIG) {
-            drawGearConfig(dc);
-        } else {
+        if ($.SHOW_DIAGNOSTICS) {
             drawTest(dc);
+        } else {
+            drawRide(dc);
         }
     }
 
@@ -139,11 +130,6 @@ class Di2StepsView extends WatchUi.DataField {
             return null;
         }
         return tf.toString() + ":" + tr.toString();
-    }
-
-    // Drivetrain topology + tooth counts.
-    private function drawGearConfig(dc as Graphics.Dc) as Void {
-        drawCentered(dc, "Di2 STEPS\nGear Config");
     }
 
     // Diagnostics: position and teeth for each end of the drivetrain, plus the
@@ -264,31 +250,4 @@ class Di2StepsView extends WatchUi.DataField {
         }
     }
 
-    private function drawCentered(dc as Graphics.Dc, msg as String) as Void {
-        var lines = split(msg, "\n");
-        var margin = 4;
-        var w = dc.getWidth() - 2 * margin;
-        var h = dc.getHeight() - 2 * margin;
-        var font = fitFont(dc, lines, w, h);
-        var lh = dc.getFontHeight(font);
-        var cx = dc.getWidth() / 2;
-        var y = (dc.getHeight() - lh * lines.size()) / 2;
-        for (var i = 0; i < lines.size(); i++) {
-            dc.drawText(cx, y, font, lines[i], Graphics.TEXT_JUSTIFY_CENTER);
-            y += lh;
-        }
-    }
-
-    // Minimal string splitter (Monkey C has no String.split for arbitrary seps).
-    private function split(s as String, sep as String) as Array<String> {
-        var out = [];
-        var idx = s.find(sep);
-        while (idx != null) {
-            out.add(s.substring(0, idx));
-            s = s.substring(idx + sep.length(), s.length());
-            idx = s.find(sep);
-        }
-        out.add(s);
-        return out;
-    }
 }

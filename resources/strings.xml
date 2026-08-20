@@ -2,10 +2,6 @@
 <strings>
     <string id="AppName">Gear Ratio</string>
 
-    <!-- Which screen the field renders (see DisplayMode enum in Di2StepsView).
-         Defaults to TEST while we are still proving the numbers are right.    -->
-    <string id="DisplayModeTitle">Display Mode</string>
-
     <!-- Drivetrain configuration. Activity.Info reports gear POSITION live but
          its tooth values are unusable on this bike (rear is a constant, front
          is 0), so teeth are entered here in position order. Ebikes are
