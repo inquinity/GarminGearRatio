@@ -15,7 +15,7 @@ enum {
 
 class Di2StepsView extends WatchUi.DataField {
 
-    private var _mode as Number = MODE_TEST;
+    private var _mode as Number = MODE_RIDE;
     private var _data as StepsData;
     private var _config as GearConfig;
 
@@ -48,7 +48,7 @@ class Di2StepsView extends WatchUi.DataField {
 
     function loadSettings() as Void {
         var m = Properties.getValue("DisplayMode");
-        _mode = (m instanceof Number) ? m : MODE_TEST;
+        _mode = (m instanceof Number) ? m : MODE_RIDE;
     }
 
     function onSettingsChanged() as Void {

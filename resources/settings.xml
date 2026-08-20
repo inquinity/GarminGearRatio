@@ -1,10 +1,12 @@
 <?xml version="1.0"?>
 <settings>
     <setting propertyKey="@Properties.DisplayMode" title="@Strings.DisplayModeTitle">
+        <!-- Ride only. Gear Config (1) is an unimplemented stub, and
+             Test (2) is a name/value diagnostic table that confused riders who
+             met it without context. Both stay reachable in the source; neither
+             belongs in a shipped settings list. -->
         <settingConfig type="list">
             <listEntry value="0">Ride</listEntry>
-            <listEntry value="1">Gear Config</listEntry>
-            <listEntry value="2">Test / Diagnostics</listEntry>
         </settingConfig>
     </setting>
 
